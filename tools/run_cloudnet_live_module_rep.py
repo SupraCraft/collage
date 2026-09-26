@@ -308,7 +308,14 @@ USER cloudnet
         log_path.write_text(log_text[-30000:], encoding="utf-8")
 
         if not isinstance(observed, dict) or observed.get("result") != "PASS":
-            raise RepError("live node did not emit exact runtime registration sentinel")
+            state = run(
+                ["docker", "inspect", CONTAINER, "--format", "{{json .State}}"],
+                temp, check=False).stdout.strip()
+            diagnostic = log_text[-16000:]
+            raise RepError(
+                "live node did not emit exact runtime registration sentinel"
+                + "\ncontainer_state=" + state
+                + "\n--- CLOUDNET LOG TAIL ---\n" + diagnostic)
         if observed.get("runtime") != RUNTIME:
             raise RepError(f"unexpected runtime in sentinel: {observed!r}")
 
