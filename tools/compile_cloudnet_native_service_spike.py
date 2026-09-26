@@ -110,9 +110,17 @@ def run(cmd: list[str], cwd: Path, timeout: int = 1800) -> subprocess.CompletedP
     except subprocess.TimeoutExpired as exc:
         raise SpikeError(f"timeout running {' '.join(cmd)}") from exc
     if cp.returncode:
-        combined = (cp.stdout or "") + "\n--- STDERR ---\n" + (cp.stderr or "")
-        detail = combined[-16000:]
-        raise SpikeError(f"command failed ({cp.returncode}): {' '.join(cmd)}\n{detail}")
+        stdout = cp.stdout or ""
+        stderr = cp.stderr or ""
+        marker = stdout.find("* What went wrong:")
+        if marker < 0:
+            marker = stdout.find("FAILURE:")
+        if marker < 0:
+            marker = max(0, len(stdout) - 10000)
+        diagnostic = stdout[marker:marker + 12000]
+        if stderr:
+            diagnostic += "\n--- STDERR TAIL ---\n" + stderr[-4000:]
+        raise SpikeError(f"command failed ({cp.returncode}): {' '.join(cmd)}\n{diagnostic}")
     return cp
 
 def main() -> int:
