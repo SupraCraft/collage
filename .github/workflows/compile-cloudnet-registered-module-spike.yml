@@ -1,0 +1,40 @@
+name: Compile CloudNet registered runtime module
+
+on:
+  pull_request:
+    paths:
+      - 'tools/compile_cloudnet_registered_module_spike.py'
+      - '.github/workflows/compile-cloudnet-registered-module-spike.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registered-module:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout COLLAGE
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up JDK 25
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287
+        with:
+          distribution: zulu
+          java-version: '25'
+      - name: Compile/package runtime module against released and nightly CloudNet
+        run: python3 tools/compile_cloudnet_registered_module_spike.py
+      - name: Publish evidence in job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### EXP-000-CLOUDNET-001 registered module spike'
+            if [[ -f cloudnet-registered-module-spike-evidence.json ]]; then
+              echo 'BEGIN_JSON'
+              cat cloudnet-registered-module-spike-evidence.json
+              echo 'END_JSON'
+            else
+              echo 'No PASS evidence file was produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
