@@ -108,14 +108,14 @@ public final class TrueNASJsonRpcClientContract implements WebSocket.Listener, A
     return this.endpoint;
   }
 
-  public CompletableFuture<Void> connect() {
+  public CompletableFuture<WebSocket> connect() {
     synchronized (this) {
       if (this.socket == null) {
         this.socket = this.httpClient.newWebSocketBuilder()
           .connectTimeout(Duration.ofSeconds(10))
           .buildAsync(this.endpoint, this);
       }
-      return this.socket.thenApply(ignored -> null);
+      return this.socket;
     }
   }
 
