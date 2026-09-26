@@ -110,7 +110,8 @@ def run(cmd: list[str], cwd: Path, timeout: int = 1800) -> subprocess.CompletedP
     except subprocess.TimeoutExpired as exc:
         raise SpikeError(f"timeout running {' '.join(cmd)}") from exc
     if cp.returncode:
-        detail = (cp.stderr or cp.stdout or "")[-8000:]
+        combined = (cp.stdout or "") + "\n--- STDERR ---\n" + (cp.stderr or "")
+        detail = combined[-16000:]
         raise SpikeError(f"command failed ({cp.returncode}): {' '.join(cmd)}\n{detail}")
     return cp
 
@@ -137,7 +138,7 @@ def main() -> int:
 
         java_version = run(["java", "-version"], checkout).stderr.strip().splitlines()[0]
         gradle = run(
-            ["./gradlew", ":node:impl:compileJava", "--no-daemon", "--stacktrace"],
+            ["./gradlew", ":node:impl:compileJava", "--no-daemon", "--console=plain"],
             checkout,
             timeout=1800,
         )
