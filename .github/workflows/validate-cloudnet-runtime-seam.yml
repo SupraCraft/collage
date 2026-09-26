@@ -1,0 +1,35 @@
+name: Validate CloudNet runtime seam
+
+on:
+  pull_request:
+    paths:
+      - 'tools/validate_cloudnet_runtime_seam.py'
+      - '.github/workflows/validate-cloudnet-runtime-seam.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout COLLAGE
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Validate exact CloudNet runtime source contract
+        run: python3 tools/validate_cloudnet_runtime_seam.py
+      - name: Publish evidence in job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### EXP-000-CLOUDNET-001 source contract'
+            if [[ -f cloudnet-runtime-seam-evidence.json ]]; then
+              echo 'BEGIN_JSON'
+              cat cloudnet-runtime-seam-evidence.json
+              echo 'END_JSON'
+            else
+              echo 'No PASS evidence file was produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
