@@ -311,14 +311,18 @@ def validate_truenas_source(label: str, ref: str, temp: Path) -> dict:
     main = (checkout / "src/middlewared/middlewared/main.py").read_text(encoding="utf-8")
     auth = (checkout / "src/middlewared/middlewared/api/v25_04_0/auth.py").read_text(encoding="utf-8")
     app = (checkout / "src/middlewared/middlewared/api/v25_04_0/app.py").read_text(encoding="utf-8")
+    app_crud = (checkout / "src/middlewared/middlewared/plugins/apps/crud.py").read_text(encoding="utf-8")
 
     required = {
         "jsonrpc_websocket_route": "f'/api/{version}'",
         "api_key_plain": "AuthMech.API_KEY_PLAIN",
         "auth_login_ex": "class AuthLoginExArgs",
-        "app_query_schema": "class AppQuery",
+        "app_entry_schema": "class AppEntry(BaseModel)",
+        "app_query_service": "def query(self, app, filters, options):",
+        "app_query_role_prefix": "role_prefix = 'APPS'",
+        "app_query_retrieve_config": "retrieve_config",
     }
-    sources = main + "\n" + auth + "\n" + app
+    sources = main + "\n" + auth + "\n" + app + "\n" + app_crud
     missing = [name for name, needle in required.items() if needle not in sources]
     if missing:
         raise ContractError(f"TrueNAS {label} source contract drift: {missing}")
