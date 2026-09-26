@@ -277,6 +277,7 @@ def main() -> int:
 USER root
 COPY --chown=cloudnet:cloudnet modules/ /home/cloudnet/modules/
 COPY --chown=cloudnet:cloudnet config.json /home/cloudnet/config.json
+ENV CLOUDNET_INSTALLATION_SKIP=true
 USER cloudnet
 """,
             encoding="utf-8")
