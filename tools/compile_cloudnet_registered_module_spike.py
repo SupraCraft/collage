@@ -298,14 +298,19 @@ def qualify_ref(label: str, ref: str, temp: Path) -> dict:
         if len(module_entries) != 1:
             raise ProbeError(f"{label}: module metadata missing/ambiguous: {module_entries}")
         module_json = json.loads(zf.read(module_entries[0]).decode("utf-8"))
+        runtime_identifier_present = any(
+            RUNTIME.encode() in zf.read(name)
+            for name in names
+            if not name.endswith("/")
+        )
 
     main = module_json.get("main")
     if main != "org.supracraft.collage.cloudnet.TrueNASNativeModuleProbe":
         raise ProbeError(f"{label}: unexpected module main {main!r}")
     if module_json.get("runtimeModule") is not True:
         raise ProbeError(f"{label}: runtimeModule flag missing")
-    if RUNTIME.encode() not in jar.read_bytes():
-        raise ProbeError(f"{label}: runtime identifier not present in packaged module")
+    if not runtime_identifier_present:
+        raise ProbeError(f"{label}: runtime identifier not present in decompressed module entries")
 
     return {
         "label": label,
