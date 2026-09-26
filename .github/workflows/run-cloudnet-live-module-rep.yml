@@ -1,0 +1,46 @@
+name: Run live CloudNet runtime-module rep
+
+on:
+  pull_request:
+    paths:
+      - 'tools/run_cloudnet_live_module_rep.py'
+      - '.github/workflows/run-cloudnet-live-module-rep.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-module:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout COLLAGE
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up JDK 25
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287
+        with:
+          distribution: zulu
+          java-version: '25'
+      - name: Run real disposable CloudNet node and register native runtime
+        run: python3 tools/run_cloudnet_live_module_rep.py
+      - name: Publish evidence in job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### EXP-000-CLOUDNET-001 live module rep'
+            if [[ -f cloudnet-live-module-evidence.json ]]; then
+              echo 'BEGIN_JSON'
+              cat cloudnet-live-module-evidence.json
+              echo 'END_JSON'
+            else
+              echo 'No PASS evidence file was produced.'
+            fi
+            if [[ -f cloudnet-live-module.log ]]; then
+              echo '### CloudNet log tail'
+              echo 'BEGIN_LOG'
+              tail -n 120 cloudnet-live-module.log
+              echo 'END_LOG'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
