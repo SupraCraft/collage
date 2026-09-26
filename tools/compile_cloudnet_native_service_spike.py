@@ -146,7 +146,7 @@ def main() -> int:
 
         java_version = run(["java", "-version"], checkout).stderr.strip().splitlines()[0]
         gradle = run(
-            ["./gradlew", ":node:impl:compileJava", "--no-daemon", "--console=plain"],
+            ["./gradlew", ":node:node-impl:compileJava", "--no-daemon", "--console=plain"],
             checkout,
             timeout=1800,
         )
@@ -157,7 +157,7 @@ def main() -> int:
             "experiment": "EXP-000-CLOUDNET-001 minimal-adapter-spike",
             "upstream": {"repository": UPSTREAM, "ref": REF},
             "java": java_version,
-            "gradle_task": ":node:impl:compileJava",
+            "gradle_task": ":node:node-impl:compileJava",
             "probe_sha256": hashlib.sha256(PROBE.encode()).hexdigest(),
             "proven": [
                 "an AbstractService subclass can compile against exact CloudNet source without patching CloudNet core",
