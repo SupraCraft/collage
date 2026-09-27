@@ -14,6 +14,8 @@ func TestCollectCollageMetadataOnlyAllowlistedKeys(t *testing.T) {
 				map[string]any{"name": "SUPRACRAFT_COLLAGE_MANAGER_ID", "value": "manager-rdte"},
 				map[string]any{"name": "SUPRACRAFT_COLLAGE_FLEET_ID", "value": "rdte"},
 				map[string]any{"name": "SUPRACRAFT_COLLAGE_SERVICE_ID", "value": "11111111-1111-4111-8111-111111111111"},
+				map[string]any{"name": "SUPRACRAFT_COLLAGE_TASK_NAME", "value": "CollageReAdopt"},
+				map[string]any{"name": "SUPRACRAFT_COLLAGE_TASK_SERVICE_ID", "value": "37"},
 				map[string]any{"name": "SUPRACRAFT_COLLAGE_WORLD_ID", "value": "world-rdte-001"},
 				map[string]any{"name": "SOME_SECRET", "value": "must-not-escape"},
 			},
@@ -28,8 +30,10 @@ func TestCollectCollageMetadataOnlyAllowlistedKeys(t *testing.T) {
 		"SUPRACRAFT_COLLAGE_SCHEMA":     "1",
 		"SUPRACRAFT_COLLAGE_MANAGER_ID": "manager-rdte",
 		"SUPRACRAFT_COLLAGE_FLEET_ID":   "rdte",
-		"SUPRACRAFT_COLLAGE_SERVICE_ID": "11111111-1111-4111-8111-111111111111",
-		"SUPRACRAFT_COLLAGE_WORLD_ID":   "world-rdte-001",
+		"SUPRACRAFT_COLLAGE_SERVICE_ID":      "11111111-1111-4111-8111-111111111111",
+		"SUPRACRAFT_COLLAGE_TASK_NAME":       "CollageReAdopt",
+		"SUPRACRAFT_COLLAGE_TASK_SERVICE_ID": "37",
+		"SUPRACRAFT_COLLAGE_WORLD_ID":        "world-rdte-001",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("metadata mismatch\n got: %#v\nwant: %#v", got, want)
@@ -42,8 +46,8 @@ func TestMissingMetadata(t *testing.T) {
 		"SUPRACRAFT_COLLAGE_SCHEMA":  "1",
 	}
 	got := missingMetadata(meta)
-	if len(got) != 4 {
-		t.Fatalf("expected four missing fields, got %v", got)
+	if len(got) != 6 {
+		t.Fatalf("expected six missing fields, got %v", got)
 	}
 }
 
