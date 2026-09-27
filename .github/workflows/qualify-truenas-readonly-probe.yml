@@ -1,0 +1,54 @@
+name: Qualify TrueNAS read-only live probe tool
+
+on:
+  pull_request:
+    paths:
+      - 'tools/truenas-readonly-probe/**'
+      - '.github/workflows/qualify-truenas-readonly-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe-tool:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools/truenas-readonly-probe
+    steps:
+      - name: Checkout COLLAGE
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: tools/truenas-readonly-probe/go.mod
+      - name: Verify dependency checksums
+        run: |
+          go mod download
+          go mod verify
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(gofmt -l .)"
+          if [[ -n "$bad" ]]; then
+            echo "$bad"
+            gofmt -d $bad
+            exit 1
+          fi
+      - name: Enforce read-only source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -En 'CreateApp|DeleteApp|CallAndWait|app\.create|app\.delete|app\.update|app\.start|app\.stop' main.go; then
+            echo 'Mutation-capable TrueNAS surface found in read-only probe'
+            exit 1
+          fi
+      - name: Vet
+        run: go vet ./...
+      - name: Test sanitizer
+        run: go test -race ./...
+      - name: Build probe
+        run: go build -trimpath -o truenas-readonly-probe .
