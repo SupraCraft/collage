@@ -278,6 +278,7 @@ USER root
 COPY --chown=cloudnet:cloudnet modules/ /home/cloudnet/modules/
 COPY --chown=cloudnet:cloudnet config.json /home/cloudnet/config.json
 ENV JAVA_TOOL_OPTIONS="-Dcloudnet.installation.skip=true"
+ENV JAVA_TOOL_OPTIONS="-Dcloudnet.installation.skip=true"
 USER cloudnet
 """,
             encoding="utf-8")
