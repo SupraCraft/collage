@@ -24,12 +24,12 @@ func TestCollectCollageMetadataOnlyAllowlistedKeys(t *testing.T) {
 	got := map[string]string{}
 	collectCollageMetadata(config, got)
 	want := map[string]string{
-		"SUPRACRAFT_COLLAGE_MANAGED":         "true",
-		"SUPRACRAFT_COLLAGE_SCHEMA":          "1",
-		"SUPRACRAFT_COLLAGE_MANAGER_ID":      "manager-rdte",
-		"SUPRACRAFT_COLLAGE_FLEET_ID":        "rdte",
-		"SUPRACRAFT_COLLAGE_SERVICE_ID":      "11111111-1111-4111-8111-111111111111",
-		"SUPRACRAFT_COLLAGE_WORLD_ID":        "world-rdte-001",
+		"SUPRACRAFT_COLLAGE_MANAGED":    "true",
+		"SUPRACRAFT_COLLAGE_SCHEMA":     "1",
+		"SUPRACRAFT_COLLAGE_MANAGER_ID": "manager-rdte",
+		"SUPRACRAFT_COLLAGE_FLEET_ID":   "rdte",
+		"SUPRACRAFT_COLLAGE_SERVICE_ID": "11111111-1111-4111-8111-111111111111",
+		"SUPRACRAFT_COLLAGE_WORLD_ID":   "world-rdte-001",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("metadata mismatch\n got: %#v\nwant: %#v", got, want)
