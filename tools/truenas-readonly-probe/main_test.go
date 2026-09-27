@@ -51,7 +51,7 @@ func TestDirectKeyShapeIsSupportedWithoutLeakingOtherKeys(t *testing.T) {
 	config := map[string]any{
 		"SUPRACRAFT_COLLAGE_MANAGED": "true",
 		"SUPRACRAFT_COLLAGE_SCHEMA":  "1",
-		"password":                    "must-not-escape",
+		"password":                   "must-not-escape",
 	}
 	got := map[string]string{}
 	collectCollageMetadata(config, got)
