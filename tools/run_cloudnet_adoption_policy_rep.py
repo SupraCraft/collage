@@ -225,24 +225,17 @@ public final class AdoptionPolicyProbeModule extends DriverModule {
     long adoptCount = observed.values().stream().filter("ADOPT"::equals).count();
     require(adoptCount == 1, "only exact match may adopt");
 
-    StringBuilder cases = new StringBuilder();
-    boolean first = true;
+    StringBuilder body = new StringBuilder();
+    body.append("result=PASS\n");
+    body.append("metadata_field_count=8\n");
+    body.append("case_count=").append(observed.size()).append("\n");
+    body.append("adopt_count=").append(adoptCount).append("\n");
+    body.append("exact_logical_name=").append(id.name()).append("\n");
+    body.append("exact_service_uuid=").append(id.uniqueId()).append("\n");
     for (var entry : observed.entrySet()) {
-      if (!first) cases.append(",");
-      first = false;
-      cases.append(""").append(entry.getKey()).append("":"").append(entry.getValue()).append(""");
+      body.append("case.").append(entry.getKey()).append("=").append(entry.getValue()).append("\n");
     }
-    String body = "{"
-      + ""schema_version":1,"
-      + ""result":"PASS","
-      + ""metadata_field_count":8,"
-      + ""case_count":" + observed.size() + ","
-      + ""adopt_count":" + adoptCount + ","
-      + ""cases":{" + cases + "},"
-      + ""exact_logical_name":"" + id.name() + "","
-      + ""exact_service_uuid":"" + id.uniqueId() + """
-      + "}\n";
-    Files.writeString(SENTINEL, body,
+    Files.writeString(SENTINEL, body.toString(),
       StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
   }
 }
@@ -320,7 +313,26 @@ USER cloudnet
         while time.monotonic()<deadline:
             cp=run(["docker","cp",f"{CONTAINER}:/home/cloudnet/collage-adoption-policy.json",str(local)],temp,check=False)
             if cp.returncode==0 and local.is_file():
-                observed=json.loads(local.read_text(encoding="utf-8"))
+                raw=local.read_text(encoding="utf-8")
+                parsed={}
+                cases={}
+                for line in raw.splitlines():
+                    key,sep,value=line.partition("=")
+                    if not sep:
+                        continue
+                    if key.startswith("case."):
+                        cases[key[5:]]=value
+                    else:
+                        parsed[key]=value
+                observed={
+                    "result":parsed.get("result"),
+                    "metadata_field_count":int(parsed.get("metadata_field_count","-1")),
+                    "case_count":int(parsed.get("case_count","-1")),
+                    "adopt_count":int(parsed.get("adopt_count","-1")),
+                    "exact_logical_name":parsed.get("exact_logical_name"),
+                    "exact_service_uuid":parsed.get("exact_service_uuid"),
+                    "cases":cases,
+                }
                 break
             state=run(["docker","inspect",CONTAINER,"--format","{{.State.Status}} {{.State.ExitCode}}"],temp).stdout.strip()
             if state.startswith("exited"): break
