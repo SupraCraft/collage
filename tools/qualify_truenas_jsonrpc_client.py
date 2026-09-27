@@ -24,6 +24,8 @@ TRUENAS_REFS = [
     ("25.04.1", "74ab5a2d373be4097dece257d00e1086376333ba"),
     ("25.04.2.6", "244b717370fe35fb9eefc3096acfbc25f12b57b6"),
 ]
+TRUENAS_GO = "https://github.com/deevus/truenas-go.git"
+TRUENAS_GO_REF = "34b24ad080f515894ff028fcf1b79bd4211ff3c1"  # v0.5.0, used by garm-provider-truenas
 PROJECT = ":modules:collage-truenas:collage-truenas-impl"
 
 BUILD_FILE = r"""plugins {
@@ -140,11 +142,11 @@ public final class TrueNASJsonRpcClientContract implements WebSocket.Listener, A
     }
   }
 
-  public CompletableFuture<Document> queryAppById(String appId) {
-    if (appId == null || appId.isBlank()) {
-      throw new IllegalArgumentException("app id is required");
+  public CompletableFuture<Document> queryAppByName(String appName) {
+    if (appName == null || appName.isBlank()) {
+      throw new IllegalArgumentException("app name is required");
     }
-    List<Object> filter = List.of("id", "=", appId);
+    List<Object> filter = List.of("name", "=", appName);
     List<Object> filters = List.of(filter);
     Map<String, Object> options = Map.of(
       "get", false,
@@ -318,6 +320,7 @@ def validate_truenas_source(label: str, ref: str, temp: Path) -> dict:
         "api_key_plain": "AuthMech.API_KEY_PLAIN",
         "auth_login_ex": "class AuthLoginExArgs",
         "app_entry_schema": "class AppEntry(BaseModel)",
+        "app_entry_name": "name: NonEmptyString",
         "app_query_service": "def query(self, app, filters, options):",
         "app_query_role_prefix": "role_prefix = 'APPS'",
         "app_query_retrieve_config": "retrieve_config",
@@ -327,6 +330,27 @@ def validate_truenas_source(label: str, ref: str, temp: Path) -> dict:
     if missing:
         raise ContractError(f"TrueNAS {label} source contract drift: {missing}")
     return {"label": label, "ref": ref, "result": "PASS", "checks": sorted(required)}
+
+def validate_truenas_go_oracle(temp: Path) -> dict:
+    checkout = temp / "truenas-go-v0.5.0"
+    clone_exact(TRUENAS_GO, TRUENAS_GO_REF, checkout, temp)
+    source = (checkout / "app_service.go").read_text(encoding="utf-8")
+    required = {
+        "get_app_with_config": "func (s *AppService) GetAppWithConfig",
+        "name_filter": 'filter := [][]any{{"name", "=", name}}',
+        "retrieve_config": 'map[string]any{"extra": map[string]any{"retrieve_config": true}}',
+        "app_query": 's.client.Call(ctx, "app.query", params)',
+    }
+    missing = [name for name, needle in required.items() if needle not in source]
+    if missing:
+        raise ContractError(f"truenas-go v0.5.0 readback oracle drift: {missing}")
+    return {
+        "repository": TRUENAS_GO,
+        "ref": TRUENAS_GO_REF,
+        "version": "v0.5.0",
+        "result": "PASS",
+        "checks": sorted(required),
+    }
 
 def inject_cloudnet_project(checkout: Path) -> None:
     settings = checkout / "settings.gradle.kts"
@@ -358,6 +382,21 @@ def qualify_cloudnet(label: str, ref: str, temp: Path) -> dict:
         ["./gradlew", ":modules:collage-truenas-client:collage-truenas-client-impl:jar", "--no-daemon", "--console=plain"],
         checkout,
     )
+    request_shape = {
+        "method": "app.query",
+        "filter_field": "name",
+        "retrieve_config": True,
+    }
+    required_client_fragments = [
+        "queryAppByName(String appName)",
+        'List.of("name", "=", appName)',
+        '"extra", Map.of("retrieve_config", true)',
+    ]
+    missing = [fragment for fragment in required_client_fragments if fragment not in CLIENT]
+    if missing:
+        raise ContractError(f"CloudNet client read-only app-query request drift: {missing}")
+    if 'queryAppById(' in CLIENT or 'List.of("id", "=", appId)' in CLIENT:
+        raise ContractError("legacy id-based App lookup remains in the client contract")
     return {
         "label": label,
         "ref": ref,
@@ -366,6 +405,7 @@ def qualify_cloudnet(label: str, ref: str, temp: Path) -> dict:
         "uses_cloudnet_document_json": "DocumentFactory.json()" in CLIENT,
         "tls_only": '"https".equalsIgnoreCase(base.getScheme())' in CLIENT,
         "no_insecure_tls_switch": True,
+        "read_only_app_query": request_shape,
         "build_output_tail": (cp.stdout or "")[-1200:],
     }
 
@@ -376,18 +416,22 @@ def main() -> int:
     temp = Path(tempfile.mkdtemp(prefix="collage-truenas-jsonrpc-"))
     try:
         tn = [validate_truenas_source(label, ref, temp) for label, ref in TRUENAS_REFS]
+        go_oracle = validate_truenas_go_oracle(temp)
         cn = [qualify_cloudnet(label, ref, temp) for label, ref in CLOUDNET_REFS]
         evidence = {
             "schema_version": 1,
             "experiment": "EXP-000-CLOUDNET-001 TrueNAS JSON-RPC client contract",
             "result": "PASS",
             "truenas_source_contracts": tn,
+            "truenas_go_readback_oracle": go_oracle,
             "cloudnet_build_contracts": cn,
             "proven": [
                 "TrueNAS 25.04.1 and 25.04.2.6 source expose the versioned /api/{version} JSON-RPC websocket route",
                 "both source versions expose auth.login_ex API_KEY_PLAIN schema",
                 "the client uses only Java built-in websocket plus CloudNet JSON document facilities",
                 "remote endpoint construction is TLS-only and fixed to /api/current",
+                "truenas-go v0.5.0 independently uses app.query filtered by App name with extra.retrieve_config=true",
+                "client app readback contract now uses the same name-filtered retrieve_config request shape",
                 "client compiles/packages against CloudNet RC17 and nightly",
                 "client surface is read-only at this stage: authentication and app.query only",
             ],
@@ -397,7 +441,7 @@ def main() -> int:
                 "no app lifecycle mutation",
                 "no CloudNet live module load",
             ],
-            "next": "run one read-only authenticated live TrueNAS probe before adding app lifecycle methods",
+            "next": "run one read-only authenticated live TrueNAS App-name query with retrieve_config before adding app lifecycle methods",
         }
         payload = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
         Path("truenas-jsonrpc-client-contract-evidence.json").write_text(payload, encoding="utf-8")
