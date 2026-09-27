@@ -1,0 +1,40 @@
+name: Qualify CloudNet native-App adoption policy
+
+on:
+  pull_request:
+    paths:
+      - 'tools/run_cloudnet_adoption_policy_rep.py'
+      - '.github/workflows/run-cloudnet-adoption-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adoption-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout COLLAGE
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up JDK 25
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287
+        with:
+          distribution: zulu
+          java-version: '25'
+      - name: Exercise fail-closed native App adoption policy
+        run: python3 tools/run_cloudnet_adoption_policy_rep.py
+      - name: Publish evidence in job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### EXP-000-CLOUDNET-001 native-App adoption policy'
+            if [[ -f cloudnet-adoption-policy-evidence.json ]]; then
+              echo 'BEGIN_JSON'
+              cat cloudnet-adoption-policy-evidence.json
+              echo 'END_JSON'
+            else
+              echo 'No PASS evidence file was produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
