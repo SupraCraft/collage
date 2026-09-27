@@ -218,6 +218,10 @@ public final class ReAdoptProbeModule extends DriverModule {
 
     var configuration = ServiceConfiguration.builder()
       .serviceId(requestedId)
+      // ServiceConfiguration keeps a separate ProcessConfiguration builder.
+      // Reasserting the environment here initializes both while preserving the
+      // explicit ServiceId identity supplied above.
+      .environment(ServiceEnvironmentType.MINECRAFT_SERVER)
       .runtime(RUNTIME)
       .maxHeapMemory(64)
       .startPort(25594)
