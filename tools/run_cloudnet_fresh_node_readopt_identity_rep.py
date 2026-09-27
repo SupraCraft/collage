@@ -188,12 +188,24 @@ public final class ReAdoptProbeModule extends DriverModule {
     }
   }
 
+  private static String jsonString(String value) {
+    if (value == null) {
+      return "";
+    }
+    return value
+      .replace("\\", "\\\\")
+      .replace("\"", "\\\"")
+      .replace("\n", "\\n")
+      .replace("\r", "\\r");
+  }
+
   @ModuleTask(order = 22)
   public void registerAndReconstruct(
     CloudServiceManager manager,
     CloudServiceFactory serviceFactory,
     @Named("module") InjectionLayer<?> layer
   ) throws Exception {
+    try {
     var factory = layer.instance(ReAdoptProbeFactory.class);
     manager.addCloudServiceFactory(RUNTIME, factory);
     require(manager.cloudServiceFactory(RUNTIME) == factory, "runtime registration read-back failed");
@@ -250,6 +262,20 @@ public final class ReAdoptProbeModule extends DriverModule {
       StandardOpenOption.CREATE,
       StandardOpenOption.TRUNCATE_EXISTING,
       StandardOpenOption.WRITE);
+    } catch (Throwable failure) {
+      String fail = "{"
+        + "\"schema_version\":1,"
+        + "\"result\":\"FAIL\","
+        + "\"error_type\":\"" + jsonString(failure.getClass().getName()) + "\","
+        + "\"error\":\"" + jsonString(failure.getMessage()) + "\""
+        + "}\n";
+      Files.writeString(
+        SENTINEL, fail,
+        StandardOpenOption.CREATE,
+        StandardOpenOption.TRUNCATE_EXISTING,
+        StandardOpenOption.WRITE);
+      throw new IllegalStateException("fresh-node identity reconstruction probe failed", failure);
+    }
   }
 
   @ModuleTask(lifecycle = ModuleLifeCycle.STOPPED)
@@ -322,7 +348,11 @@ def run_fresh_node(temp:Path, image:str, suffix:str)->dict:
             time.sleep(2)
         if not isinstance(observed,dict) or observed.get("result")!="PASS":
             logs=run(["docker","logs",container],temp,check=False)
-            raise RepError("fresh node did not emit PASS sentinel\n"+((logs.stdout or "")+(logs.stderr or ""))[-24000:])
+            raise RepError(
+                "fresh node did not emit PASS sentinel"
+                + f"\nobserved={observed!r}"
+                + "\n--- DOCKER LOG TAIL ---\n"
+                + ((logs.stdout or "")+(logs.stderr or ""))[-24000:])
         if observed.get("service_uuid")!=FIXED_UUID or observed.get("service_name")!=EXPECTED_NAME:
             raise RepError(f"fresh node identity drift: {observed!r}")
         return observed
