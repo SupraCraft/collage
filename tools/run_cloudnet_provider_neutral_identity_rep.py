@@ -232,6 +232,7 @@ import eu.cloudnetservice.driver.provider.CloudServiceFactory;
 import eu.cloudnetservice.driver.service.ServiceConfiguration;
 import eu.cloudnetservice.driver.service.ServiceCreateResult;
 import eu.cloudnetservice.driver.service.ServiceEnvironmentType;
+import eu.cloudnetservice.driver.service.ServiceId;
 import eu.cloudnetservice.node.service.CloudServiceManager;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -253,7 +254,7 @@ public final class NeutralIdentityProbeModule extends DriverModule {
   private static ServiceConfiguration desired() {
     var id = CloudNetIdentityDerivation.serviceId(STABLE_UUID);
     return ServiceConfiguration.builder()
-      .serviceId(id)
+      .serviceId(ServiceId.builder(id))
       .environment(ServiceEnvironmentType.MINECRAFT_SERVER)
       .runtime(RUNTIME)
       .maxHeapMemory(64)
