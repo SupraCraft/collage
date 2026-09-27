@@ -26,10 +26,10 @@ func TestCollectCollageMetadataOnlyAllowlistedKeys(t *testing.T) {
 	got := map[string]string{}
 	collectCollageMetadata(config, got)
 	want := map[string]string{
-		"SUPRACRAFT_COLLAGE_MANAGED":    "true",
-		"SUPRACRAFT_COLLAGE_SCHEMA":     "1",
-		"SUPRACRAFT_COLLAGE_MANAGER_ID": "manager-rdte",
-		"SUPRACRAFT_COLLAGE_FLEET_ID":   "rdte",
+		"SUPRACRAFT_COLLAGE_MANAGED":         "true",
+		"SUPRACRAFT_COLLAGE_SCHEMA":          "1",
+		"SUPRACRAFT_COLLAGE_MANAGER_ID":      "manager-rdte",
+		"SUPRACRAFT_COLLAGE_FLEET_ID":        "rdte",
 		"SUPRACRAFT_COLLAGE_SERVICE_ID":      "11111111-1111-4111-8111-111111111111",
 		"SUPRACRAFT_COLLAGE_TASK_NAME":       "CollageReAdopt",
 		"SUPRACRAFT_COLLAGE_TASK_SERVICE_ID": "37",
