@@ -3,7 +3,7 @@
 
 The durable native-App contract carries only provider-neutral COLLAGE identity.
 CloudNet's task name/task-service id are derived adapter state:
-  taskName = "collage-" + stable service UUID
+  taskName = canonical stable service UUID
   taskServiceId = 1
 
 Two fresh released CloudNet nodes must derive exactly the same ServiceId. Each
@@ -24,11 +24,12 @@ from pathlib import Path
 
 UPSTREAM="https://github.com/CloudNetService/CloudNet.git"
 REF="f8dc563272f2d4bf59772d0bcaeb713a5cc43ffb"
+NIGHTLY_REF="d74c455f766f25cbd6c7fba051ef4795b90a69c4"
 IMAGE="cloudnetservice/cloudnet:4.0.0-RC17"
 PROJECT=":modules:collage-neutral-identity:collage-neutral-identity-impl"
 RUNTIME="truenas-native"
 SERVICE_UUID="11111111-1111-4111-8111-111111111111"
-EXPECTED_TASK_NAME="collage-"+SERVICE_UUID
+EXPECTED_TASK_NAME=SERVICE_UUID
 EXPECTED_TASK_ID=1
 EXPECTED_LOGICAL_NAME=EXPECTED_TASK_NAME+"-1"
 
@@ -60,7 +61,7 @@ public final class CloudNetIdentityDerivation {
   public static final int TASK_SERVICE_ID = 1;
 
   public static String taskName(UUID serviceId) {
-    var value = "collage-" + serviceId;
+    var value = serviceId.toString();
     if (!ServiceTask.NAMING_PATTERN.matcher(value).matches()) {
       throw new IllegalArgumentException("derived task name violates CloudNet naming policy");
     }
@@ -277,9 +278,9 @@ public final class NeutralIdentityProbeModule extends DriverModule {
     require(manager.cloudServiceFactory(RUNTIME) == factory, "runtime registration failed");
 
     var expected = CloudNetIdentityDerivation.serviceId(STABLE_UUID);
-    require(expected.taskName().equals("collage-" + STABLE_UUID), "derived task name drift");
+    require(expected.taskName().equals(STABLE_UUID.toString()), "derived task name drift");
     require(expected.taskServiceId() == 1, "derived task id drift");
-    require(expected.name().equals("collage-" + STABLE_UUID + "-1"), "derived logical name drift");
+    require(expected.name().equals(STABLE_UUID + "-1"), "derived logical name drift");
 
     var first = serviceFactory.createCloudService(desired());
     require(first.state() == ServiceCreateResult.State.CREATED, "first derived service create failed");
@@ -428,6 +429,15 @@ def main()->int:
             raise RepError("source ref mismatch")
         jar=inject(checkout)
 
+        nightly=temp/"CloudNet-nightly"
+        run(["git","init","--quiet",str(nightly)],temp)
+        run(["git","-C",str(nightly),"remote","add","origin",UPSTREAM],temp)
+        run(["git","-C",str(nightly),"fetch","--quiet","--depth","1","origin",NIGHTLY_REF],temp)
+        run(["git","-C",str(nightly),"checkout","--quiet","--detach","FETCH_HEAD"],temp)
+        if run(["git","-C",str(nightly),"rev-parse","HEAD"],temp).stdout.strip()!=NIGHTLY_REF:
+            raise RepError("nightly source ref mismatch")
+        inject(nightly)
+
         run(["docker","pull",IMAGE],temp,timeout=1200)
         revision=run(["docker","image","inspect",IMAGE,"--format",'{{ index .Config.Labels "org.opencontainers.image.revision" }}'],temp).stdout.strip()
         if revision!=REF: raise RepError("image revision mismatch")
@@ -466,18 +476,19 @@ USER cloudnet
           "schema_version":1,
           "experiment":"EXP-000-CLOUDNET-001 provider-neutral CloudNet identity derivation",
           "result":"PASS",
-          "upstream":{"repository":UPSTREAM,"ref":REF,"image":IMAGE,"oci_revision":revision},
+          "upstream":{"repository":UPSTREAM,"ref":REF,"nightly_ref":NIGHTLY_REF,"image":IMAGE,"oci_revision":revision},
           "mapping":{
             "durable_input":"SUPRACRAFT_COLLAGE_SERVICE_ID UUID",
-            "cloudnet_task_name":"collage-<service-uuid>",
+            "cloudnet_task_name":"<canonical-service-uuid>",
             "cloudnet_task_service_id":1,
             "cloudnet_fields_persisted_in_native_app":False
           },
           "first_fresh_node":first,
           "second_fresh_node":second,
           "proven":[
-            "CloudNet task identity is deterministically derivable from provider-neutral stable service UUID",
-            "the derived task name satisfies CloudNet's released naming policy",
+            "CloudNet task identity is the canonical provider-neutral stable service UUID plus fixed task-service id 1",
+            "the canonical UUID task name satisfies CloudNet's released naming policy",
+            "the same injected adapter source compiles against the pinned CloudNet nightly ref",
             "two fresh CloudNet nodes reconstruct exactly the same logical identity from the same UUID",
             "a duplicate occupied identity is rejected before the accepted/backend path",
             "no CloudNet task name or task-service id needs to be persisted in the native App metadata",
