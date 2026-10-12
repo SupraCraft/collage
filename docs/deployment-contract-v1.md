@@ -36,6 +36,14 @@ python3 tools/collage_deploy_plan.py \
   --artifact-root /path/to/staged-candidates
 \`\`\`
 
+A checked-in executable example uses an intentionally **non-playable**
+source fixture and its exact Git-producing commit:
+
+\`\`\`sh
+python3 tools/collage_deploy_plan.py \
+  --request examples/source-only-rdte.json --artifact-root .
+\`\`\`
+
 Exit 0 means **source-validated intent only**; exit 2 means fail-closed refusal. Both return machine-readable JSON. \`intent_sha256\` is intentionally independent of request ID and declared principal, allowing a human/CI/agent parity comparison for equivalent desired deployments. \`request_sha256\` preserves each complete caller request. Failure output is reason-coded and omits input values and secrets.
 
 No direct TrueNAS APPLY, public world-serving link, or operational promotion is available in this version.
