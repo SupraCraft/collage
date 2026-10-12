@@ -47,6 +47,7 @@ class PlanTests(unittest.TestCase):
                               "claimed_scopes": ["deploy:plan"]},
             "target": {"provider": "truenas",
                        "deployment_id": "two-rivers-test",
+                       "service_id": "11111111-1111-4111-8111-111111111111",
                        "world_id": "two-rivers-world",
                        "minecraft_version": "26.3",
                        "backend": "vanilla",
@@ -127,6 +128,17 @@ class PlanTests(unittest.TestCase):
         req = self.request()
         req["target"]["backend"] = "paper"
         self.reject(req, "TWO_RIVERS_REQUIRES_VANILLA")
+
+    def test_optional_native_service_id_is_v4_and_intent_bound(self):
+        req = self.request()
+        base = self.good(req)["intent_sha256"]
+        req["target"]["service_id"] = "22222222-2222-4222-8222-222222222222"
+        self.assertNotEqual(self.good(req)["intent_sha256"], base)
+        req["target"]["service_id"] = "not-a-uuid"
+        self.reject(req, "INVALID_SERVICE_ID")
+        req = self.request()
+        del req["target"]["service_id"]
+        self.assertEqual(self.good(req)["classification"], "SOURCE_VALIDATED")
 
     def test_reject_digest_drift(self):
         req = self.request()
