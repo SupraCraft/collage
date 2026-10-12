@@ -25,6 +25,7 @@ ACTIONS = {"plan"}
 KINDS = {"human", "automation", "agent"}
 ARTIFACT_KINDS = {"world-save", "datapack", "resource-pack", "structure"}
 MAX_LOCAL_ARTIFACT_BYTES = 512 * 1024 * 1024
+MAX_REQUEST_BYTES = 128 * 1024
 
 
 class Refused(Exception):
@@ -82,6 +83,8 @@ def read_json(path: pathlib.Path) -> dict:
         return obj
 
     try:
+        require(path.is_file() and 0 < path.stat().st_size <= MAX_REQUEST_BYTES,
+                "REQUEST_SIZE_OUT_OF_BOUNDS")
         return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique,
                           parse_constant=lambda _: (_ for _ in ()).throw(
                               Refused("INVALID_JSON_CONSTANT")))
@@ -97,20 +100,23 @@ def check_artifact(root: pathlib.Path, name: str, expected: str) -> tuple[int, s
     parts = pathlib.PurePosixPath(name).parts
     require(parts and all(part not in {".", ".."} for part in parts),
             "UNSAFE_ARTIFACT_PATH")
-    root = root.resolve()
-    candidate = root
-    for part in parts:
-        candidate = candidate / part
-        require(not candidate.is_symlink(), "UNSAFE_ARTIFACT_PATH")
-    resolved = candidate.resolve()
-    require(resolved.is_relative_to(root) and resolved.is_file(), "ARTIFACT_NOT_FOUND")
-    size = resolved.stat().st_size
-    require(0 < size <= MAX_LOCAL_ARTIFACT_BYTES, "ARTIFACT_SIZE_OUT_OF_BOUNDS")
-    hasher = hashlib.sha256()
-    with resolved.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            hasher.update(block)
-    actual = hasher.hexdigest()
+    try:
+        root = root.resolve()
+        candidate = root
+        for part in parts:
+            candidate = candidate / part
+            require(not candidate.is_symlink(), "UNSAFE_ARTIFACT_PATH")
+        resolved = candidate.resolve()
+        require(resolved.is_relative_to(root) and resolved.is_file(), "ARTIFACT_NOT_FOUND")
+        size = resolved.stat().st_size
+        require(0 < size <= MAX_LOCAL_ARTIFACT_BYTES, "ARTIFACT_SIZE_OUT_OF_BOUNDS")
+        hasher = hashlib.sha256()
+        with resolved.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                hasher.update(block)
+        actual = hasher.hexdigest()
+    except OSError:
+        raise Refused("ARTIFACT_UNREADABLE") from None
     require(actual == expected, "ARTIFACT_DIGEST_MISMATCH")
     return size, actual
 
