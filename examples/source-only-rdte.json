@@ -20,7 +20,8 @@
     "world_id": "two-rivers-contract-world",
     "minecraft_version": "26.3",
     "backend": "vanilla",
-    "purpose": "two-rivers"
+    "purpose": "two-rivers",
+    "service_id": "11111111-1111-4111-8111-111111111111"
   },
   "artifact": {
     "kind": "world-save",
