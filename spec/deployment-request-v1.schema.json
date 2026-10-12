@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SupraCraft/collage/blob/main/spec/deployment-request-v1.schema.json",
+  "title": "COLLAGE deployment intent v1 (source-only planning)",
+  "description": "Syntactic contract for an immutable-artifact deployment intention. It does not confer authorization, verify identity, observe a provider, or authorize APPLY. Cross-realm, artifact digest and exact-runtime semantics require the fail-closed planner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "request_id", "realm_id", "environment", "principal", "authorization", "target", "artifact", "action"],
+  "properties": {
+    "schema": {"const": "collage.deployment-request/1"},
+    "request_id": {"$ref": "#/$defs/identifier"},
+    "realm_id": {"$ref": "#/$defs/realm"},
+    "environment": {"enum": ["rdte", "operations"]},
+    "action": {"const": "plan"},
+    "ttl_seconds": {"type": "integer", "minimum": 60, "maximum": 86400},
+    "expected_current_release": {
+      "anyOf": [{"$ref": "#/$defs/identifier"}, {"type": "null"}]
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "issuer", "subject"],
+      "properties": {
+        "kind": {"enum": ["human", "automation", "agent"]},
+        "issuer": {"$ref": "#/$defs/identifier"},
+        "subject": {"$ref": "#/$defs/identifier"},
+        "delegation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sponsor", "expires_at", "claimed_scopes"],
+          "properties": {
+            "sponsor": {"$ref": "#/$defs/identifier"},
+            "expires_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+            "claimed_scopes": {"const": ["deploy:plan"]}
+          }
+        }
+      },
+      "allOf": [{
+        "if": {"properties": {"kind": {"const": "agent"}}, "required": ["kind"]},
+        "then": {"required": ["delegation"]},
+        "else": {"not": {"required": ["delegation"]}}
+      }]
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["audience_realm_id", "claimed_scopes"],
+      "properties": {
+        "audience_realm_id": {"$ref": "#/$defs/realm"},
+        "claimed_scopes": {"const": ["deploy:plan"]}
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "deployment_id", "world_id", "minecraft_version", "backend", "purpose"],
+      "properties": {
+        "provider": {"const": "truenas"},
+        "deployment_id": {"$ref": "#/$defs/identifier"},
+        "world_id": {"$ref": "#/$defs/identifier"},
+        "minecraft_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+){1,2}$"},
+        "backend": {"enum": ["vanilla", "paper"]},
+        "purpose": {"enum": ["two-rivers", "generic"]}
+      },
+      "allOf": [{
+        "if": {"properties": {"purpose": {"const": "two-rivers"}}, "required": ["purpose"]},
+        "then": {"properties": {"backend": {"const": "vanilla"}}}
+      }]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "relative_path", "sha256", "producer", "release_id", "world_id", "minecraft_version"],
+      "properties": {
+        "kind": {"enum": ["world-save", "datapack", "resource-pack", "structure"]},
+        "relative_path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "producer": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$"},
+        "release_id": {"$ref": "#/$defs/identifier"},
+        "world_id": {"$ref": "#/$defs/identifier"},
+        "minecraft_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+){1,2}$"}
+      }
+    }
+  },
+  "allOf": [{
+    "if": {"properties": {"environment": {"const": "rdte"}}, "required": ["environment"]},
+    "then": {"required": ["ttl_seconds"]},
+    "else": {"not": {"required": ["ttl_seconds"]}}
+  }],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+    "realm": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
