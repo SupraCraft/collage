@@ -168,7 +168,8 @@ def plan(request: dict, artifact_root: pathlib.Path, now: dt.datetime | None = N
         require("delegation" not in p, "UNEXPECTED_DELEGATION")
 
     t = fields(r["target"], {"provider", "deployment_id", "world_id",
-                             "minecraft_version", "backend", "purpose"})
+                             "minecraft_version", "backend", "purpose"},
+               {"service_id"})
     require(t["provider"] == "truenas"
             and identifier(t["deployment_id"]) and identifier(t["world_id"]),
             "INVALID_TARGET")
@@ -181,6 +182,8 @@ def plan(request: dict, artifact_root: pathlib.Path, now: dt.datetime | None = N
             and t["purpose"] in {"two-rivers", "generic"}, "INVALID_PURPOSE")
     require(t["purpose"] != "two-rivers" or t["backend"] == "vanilla",
             "TWO_RIVERS_REQUIRES_VANILLA")
+    if "service_id" in t:
+        require(realm_uuid(t["service_id"]), "INVALID_SERVICE_ID")
 
     artifact = fields(r["artifact"], {"kind", "relative_path", "sha256",
                                      "producer", "release_id", "world_id",
