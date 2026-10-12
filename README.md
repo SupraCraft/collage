@@ -24,13 +24,13 @@ TrueNAS/CloudNet world-runtime and independent world-activation adapters.
 
 Runnable source-only example from a checkout:
 
-\`\`\`sh
+```sh
 python3 tools/collage_deploy_plan.py \
   --request examples/source-only-rdte.json --artifact-root .
-\`\`\`
+```
 
 The example intentionally references a **non-playable fixture**. A green
-\`SOURCE_VALIDATED\` response does *not* authenticate a principal, verify a
+`SOURCE_VALIDATED` response does *not* authenticate a principal, verify a
 Minecraft artifact format, touch a TrueNAS host, or authorize APPLY.
 
 See [deployment contract v1](docs/deployment-contract-v1.md), the
