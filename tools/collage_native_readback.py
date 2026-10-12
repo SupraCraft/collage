@@ -14,7 +14,10 @@ import pathlib
 import subprocess
 import sys
 
-from collage_deploy_plan import Refused, plan, read_json
+if __package__:
+    from .collage_deploy_plan import Refused, plan, read_json
+else:
+    from collage_deploy_plan import Refused, plan, read_json
 
 SCHEMA = "collage.native-readback/1"
 MAX_PROBE_OUTPUT = 32768
@@ -44,7 +47,8 @@ def compare_native(request: dict, observed: object,
                 "container_count", "collage_metadata", "metadata_required"}
     if not required <= observed.keys():
         raise Refused("INVALID_PROVIDER_REPORT")
-    if (observed["result"] != "PASS" or observed["schema_version"] != 1
+    if (observed["result"] != "PASS" or type(observed["schema_version"]) is not int
+            or observed["schema_version"] != 1
             or observed["metadata_required"] is not True
             or observed["config_present"] is not True
             or observed["custom_app"] is not False
@@ -126,7 +130,7 @@ def main() -> int:
                   "reason": exc.code, "mutation_authorized": False,
                   "provider_observed": False}
         status = 2
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, UnicodeError, subprocess.TimeoutExpired):
         result = {"schema": SCHEMA, "classification": "INCONCLUSIVE",
                   "reason": "PROBE_EXECUTION_UNAVAILABLE",
                   "mutation_authorized": False, "provider_observed": False}
