@@ -19,6 +19,7 @@ SCHEMA = "collage.deployment-request/1"
 RECEIPT = "collage.deployment-plan/1"
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 IDENT = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+PRINCIPAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:/._@+-]{0,255}$")
 PRODUCER = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$")
 ACTIONS = {"plan"}
 KINDS = {"human", "automation", "agent"}
@@ -46,6 +47,10 @@ def fields(obj: object, mandatory: set[str], optional: set[str] = frozenset()) -
 
 def identifier(value: object) -> bool:
     return isinstance(value, str) and bool(IDENT.fullmatch(value))
+
+
+def principal_id(value: object) -> bool:
+    return isinstance(value, str) and bool(PRINCIPAL_ID.fullmatch(value))
 
 
 def realm_uuid(value: object) -> bool:
@@ -126,8 +131,10 @@ def plan(request: dict, artifact_root: pathlib.Path, now: dt.datetime | None = N
                          "action"}, {"ttl_seconds", "expected_current_release"})
     require(r["schema"] == SCHEMA, "SCHEMA_UNSUPPORTED")
     require(identifier(r["request_id"]) and realm_uuid(r["realm_id"]), "INVALID_IDENTITY")
-    require(r["environment"] in {"rdte", "operations"}, "INVALID_ENVIRONMENT")
-    require(r["action"] in ACTIONS, "MUTATION_NOT_ADMITTED")
+    require(isinstance(r["environment"], str)
+            and r["environment"] in {"rdte", "operations"}, "INVALID_ENVIRONMENT")
+    require(isinstance(r["action"], str)
+            and r["action"] in ACTIONS, "MUTATION_NOT_ADMITTED")
     if r["environment"] == "rdte":
         require(type(r.get("ttl_seconds")) is int
                 and 60 <= r["ttl_seconds"] <= 86400, "INVALID_RDTE_TTL")
@@ -138,7 +145,8 @@ def plan(request: dict, artifact_root: pathlib.Path, now: dt.datetime | None = N
                 or identifier(r["expected_current_release"]), "INVALID_RELEASE")
 
     p = fields(r["principal"], {"kind", "issuer", "subject"}, {"delegation"})
-    require(p["kind"] in KINDS and identifier(p["issuer"]) and identifier(p["subject"]),
+    require(isinstance(p["kind"], str) and p["kind"] in KINDS
+            and principal_id(p["issuer"]) and principal_id(p["subject"]),
             "INVALID_PRINCIPAL")
     a = fields(r["authorization"], {"audience_realm_id", "claimed_scopes"})
     require(a["audience_realm_id"] == r["realm_id"], "CROSS_REALM")
@@ -146,7 +154,7 @@ def plan(request: dict, artifact_root: pathlib.Path, now: dt.datetime | None = N
             and a["claimed_scopes"] == ["deploy:plan"], "CLAIMED_SCOPE_INVALID")
     if p["kind"] == "agent":
         delegation = fields(p.get("delegation"), {"sponsor", "expires_at", "claimed_scopes"})
-        require(identifier(delegation["sponsor"]), "INVALID_DELEGATION")
+        require(principal_id(delegation["sponsor"]), "INVALID_DELEGATION")
         require(delegation["claimed_scopes"] == ["deploy:plan"], "INVALID_DELEGATION")
         current = now or dt.datetime.now(dt.timezone.utc)
         require(parse_time(delegation["expires_at"]) > current, "DELEGATION_EXPIRED")
@@ -158,18 +166,21 @@ def plan(request: dict, artifact_root: pathlib.Path, now: dt.datetime | None = N
     require(t["provider"] == "truenas"
             and identifier(t["deployment_id"]) and identifier(t["world_id"]),
             "INVALID_TARGET")
-    require(t["backend"] in {"vanilla", "paper"}
+    require(isinstance(t["backend"], str)
+            and t["backend"] in {"vanilla", "paper"}
             and isinstance(t["minecraft_version"], str)
             and bool(re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,2}", t["minecraft_version"])),
             "INVALID_RUNTIME")
-    require(t["purpose"] in {"two-rivers", "generic"}, "INVALID_PURPOSE")
+    require(isinstance(t["purpose"], str)
+            and t["purpose"] in {"two-rivers", "generic"}, "INVALID_PURPOSE")
     require(t["purpose"] != "two-rivers" or t["backend"] == "vanilla",
             "TWO_RIVERS_REQUIRES_VANILLA")
 
     artifact = fields(r["artifact"], {"kind", "relative_path", "sha256",
                                      "producer", "release_id", "world_id",
                                      "minecraft_version"})
-    require(artifact["kind"] in ARTIFACT_KINDS
+    require(isinstance(artifact["kind"], str)
+            and artifact["kind"] in ARTIFACT_KINDS
             and identifier(artifact["release_id"])
             and identifier(artifact["world_id"])
             and artifact["world_id"] == t["world_id"], "ARTIFACT_WORLD_MISMATCH")
