@@ -6,6 +6,8 @@ import datetime as dt
 import hashlib
 import json
 import pathlib
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -165,6 +167,53 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(receipt["next_gate"],
                          "INDEPENDENT_PROVIDER_READBACK_AND_AUTHORIZATION")
         self.assertNotIn("truenas_observed_state", receipt)
+
+
+    def test_cli_smoke_is_machine_readable_and_non_mutating(self):
+        request_file = self.root / "request.json"
+        request_file.write_text(json.dumps(self.request()))
+        entrypoint = pathlib.Path(__file__).resolve().parents[1] / "tools" / "collage_deploy_plan.py"
+        cp = subprocess.run([sys.executable, str(entrypoint),
+                             "--request", str(request_file),
+                             "--artifact-root", str(self.root)],
+                            capture_output=True, text=True, check=False)
+        self.assertEqual(cp.returncode, 0, cp.stderr)
+        receipt = json.loads(cp.stdout)
+        self.assertEqual(receipt["classification"], "SOURCE_VALIDATED")
+        self.assertFalse(receipt["mutation_authorized"])
+        self.assertFalse(receipt["provider_observed"])
+        self.assertFalse(receipt["authorization_verified"])
+
+    def test_malformed_unhashable_values_refuse_without_crash(self):
+        fields_to_break = [
+            ("environment",), ("action",), ("principal", "kind"),
+            ("target", "backend"), ("target", "purpose"), ("artifact", "kind")
+        ]
+        for path in fields_to_break:
+            req = self.request()
+            node = req
+            for key in path[:-1]:
+                node = node[key]
+            node[path[-1]] = []
+            with self.subTest(path=path):
+                with self.assertRaises(Refused):
+                    self.good(req)
+
+    def test_namespaced_issuers_and_subjects(self):
+        req = self.request("agent")
+        req["principal"]["issuer"] = "urn:supracraft:workload:rdte"
+        req["principal"]["subject"] = "realm/example/actor@host"
+        receipt = self.good(req)
+        self.assertEqual(receipt["declared_principal_issuer"],
+                         "urn:supracraft:workload:rdte")
+        self.assertFalse(receipt["principal_authenticated"])
+
+    def test_reject_oversized_request_file(self):
+        p = self.root / "oversized.json"
+        p.write_bytes(b" " * (128 * 1024 + 1))
+        with self.assertRaises(Refused) as caught:
+            read_json(p)
+        self.assertEqual(caught.exception.code, "REQUEST_SIZE_OUT_OF_BOUNDS")
 
 
 if __name__ == "__main__":
