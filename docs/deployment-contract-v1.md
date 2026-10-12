@@ -64,6 +64,28 @@ World activation must follow the already published transaction:
 `candidate_staged → candidate_hash_verified → quiesce → snapshot_current → activate_candidate → resume → health_check`.
 Failures restore/recheck according to the published failure policy. This request contract does not replace that transaction.
 
+## First native TrueNAS read-only join (implementation, not live acceptance)
+
+The v1 source contract may optionally include `target.service_id` (stable RFC 4122 version-4 UUID). A provider-bound request **must** include it. The existing six native App ownership metadata fields then bind service UUID, world, manager/fleet and managed/schema markers. `realm_id` is site-context-bound; no claim is made that those six fields cryptographically bind a realm.
+
+[tools/collage_native_readback.py](../tools/collage_native_readback.py) is a thin executable wrapper around the *existing* repository-owned, TLS-verified `tools/truenas-readonly-probe` Go source. It validates the local artifact/request, then **itself invokes** the read-only Go `app.query` probe and compares live returned App metadata with the request and admitted site tuple.
+
+On an authorized **disposable** test boundary with Go 1.25 and a verified TrueNAS TLS trust root (for example, explicitly installed trust or a pinned `SSL_CERT_FILE`), pass a scoped **read-only** TrueNAS API credential through the existing process environment, never an argument or issue:
+
+```sh
+python3 tools/collage_native_readback.py \
+  --request /path/to/actual-readonly-request.json \
+  --artifact-root /path/to/staged-artifact \
+  --host <isolated-disposable-truenas-host> \
+  --username <scoped-readonly-username> \
+  --trusted-realm-id <pinned-local-realm-uuid> \
+  --manager-id manager-rdte --fleet-id rdte
+```
+
+Its `PROVIDER_READBACK_MATCH` means only that **this process ran the approved authenticated/TLS-verified native App read-only probe and matched App ownership state**. It does not prove game version/protocol, world artifact format/deployment, CloudNet adoption, player/agent authorization, cryptographic realm binding, or physical host qualification. Under no condition does this wrapper issue TrueNAS mutations. A supplied JSON document alone cannot produce a runtime PASS; synthetic documents used in unit tests test **policy matching only**.
+
+This runtime join **has not yet been executed in the disposable KVM guest**. Its real-system acceptance is tracked in [public COLLAGE issue #19](https://github.com/SupraCraft/collage/issues/19). The checked-in example fixture is deliberately non-playable; it must not be used to infer a successful Two Rivers deployment.
+
 ## Next live executable increments (do not promote source proof)
 
 1. Admit a public-only Agent Dispatch nested TrueNAS request **separate** from the accepted standalone Paper T6 fixture; do not blindly rerun existing heavy proofs.
