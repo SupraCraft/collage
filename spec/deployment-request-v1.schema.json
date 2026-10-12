@@ -178,6 +178,10 @@
             "two-rivers",
             "generic"
           ]
+        },
+        "service_id": {
+          "$ref": "#/$defs/realm",
+          "description": "Optional for v1 source-only plan; mandatory for provider-bound readback. Immutable native App service UUID, not player UUID."
         }
       },
       "allOf": [
