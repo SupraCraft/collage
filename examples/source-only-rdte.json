@@ -1,0 +1,37 @@
+{
+  "schema": "collage.deployment-request/1",
+  "request_id": "two-rivers-contract-example",
+  "realm_id": "d68a14b9-2a1c-4e83-a452-e3b569cdf93e",
+  "environment": "rdte",
+  "principal": {
+    "kind": "automation",
+    "issuer": "urn:supracraft:rdte:sample",
+    "subject": "source-contract-ci"
+  },
+  "authorization": {
+    "audience_realm_id": "d68a14b9-2a1c-4e83-a452-e3b569cdf93e",
+    "claimed_scopes": [
+      "deploy:plan"
+    ]
+  },
+  "target": {
+    "provider": "truenas",
+    "deployment_id": "two-rivers-contract-only",
+    "world_id": "two-rivers-contract-world",
+    "minecraft_version": "26.3",
+    "backend": "vanilla",
+    "purpose": "two-rivers"
+  },
+  "artifact": {
+    "kind": "world-save",
+    "relative_path": "examples/contract-only-world.fixture",
+    "sha256": "1bf2f5dc94efbbf2bf8e8dde6479aca9460b35c90442649998d498bc4f890eff",
+    "producer": "SupraCraft/collage@357812cba766a670bff5c1b04935c78982d12617",
+    "release_id": "source-fixture-only",
+    "world_id": "two-rivers-contract-world",
+    "minecraft_version": "26.3"
+  },
+  "action": "plan",
+  "expected_current_release": null,
+  "ttl_seconds": 3600
+}
