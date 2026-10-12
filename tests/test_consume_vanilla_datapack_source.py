@@ -82,7 +82,8 @@ class ConsumerTests(unittest.TestCase):
     def test_unsafe_member_refused(self):
         self.blobs["../outside"] = b"hidden\n"
         self.generate()
-        self.reject("CANDIDATE_MEMBERS_DRIFT")
+        # Manifest member-count validation is the earliest independent guard.
+        self.reject("CANDIDATE_MEMBER_MANIFEST")
 
     def test_wrong_runtime_and_unqualified_claim_refused(self):
         self.manifest["minecraft_version"] = "1.21.11"
