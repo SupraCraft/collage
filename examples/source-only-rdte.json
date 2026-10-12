@@ -26,7 +26,7 @@
     "kind": "world-save",
     "relative_path": "examples/contract-only-world.fixture",
     "sha256": "1bf2f5dc94efbbf2bf8e8dde6479aca9460b35c90442649998d498bc4f890eff",
-    "producer": "SupraCraft/collage@357812cba766a670bff5c1b04935c78982d12617",
+    "producer": "SupraCraft/collage@6ffb737771b1128672d43ca1ddf07ed2b6abb2a2",
     "release_id": "source-fixture-only",
     "world_id": "two-rivers-contract-world",
     "minecraft_version": "26.3"
