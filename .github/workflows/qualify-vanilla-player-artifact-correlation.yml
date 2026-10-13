@@ -48,7 +48,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-      - uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Install exactly qualified protocol-777 experimental client dependencies
