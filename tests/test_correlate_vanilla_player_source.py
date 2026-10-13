@@ -1,0 +1,130 @@
+"""OP-3D no-game cheap negative verification of correlation only."""
+import copy
+import unittest
+
+from tools.correlate_vanilla_player_source import correlate, Refused, PRODUCER
+
+HASH = "da25005e8729e6f013f7108ac5b8869dd46323befc78efdae18221b26cafe5f8"
+B = "1"*64
+C = "2"*64
+
+
+def fixture():
+    identity = {"producer": PRODUCER, "sha256": HASH,
+                "world_id": "lantern-rdte",
+                "release_id": "lantern-core-restore-26-3",
+                "archive_size": 739,
+                "world_save_included": False, "collage_deployed": False}
+    client = {"requested_version": "26.3", "negotiated_version": "26.3",
+              "protocol": 777, "offline_mode": True,
+              "server_join_independently_observed": True,
+              "client_saw_air_before": True,
+              "client_saw_redstone_after": True,
+              "action": "mineflayer.placeBlock"}
+    plans = {"schema": "collage.artifact-consumer-source-parity/1",
+             "classification": "SOURCE_ARTIFACT_AND_INTENT_PARITY_VALIDATED",
+             "common_intent_sha256": "f"*64,
+             "candidate": {"producer": PRODUCER, "sha256": HASH,
+                           "world_id": identity["world_id"],
+                           "release_id": identity["release_id"],
+                           "minecraft_version": "26.3", "kind": "datapack",
+                           "member_count": 3},
+             "audience_receipts": {
+                 x: {"source_classification": "SOURCE_VALIDATED",
+                     "request_sha256": "b"*64}
+                 for x in ("human", "automation", "agent")
+             },
+             "principal_authenticated": False,
+             "real_provider_readback": False, "world_activated": False,
+             "mutation_authorized": False}
+    player = {
+        "schema": "supracraft.op3c-vanilla-client-world-artifact/1",
+        "classification": "REAL_OFFLINE_PLAYER_ACTION_CAUSAL_ARTIFACT_AND_ROLLBACK",
+        "producer": PRODUCER, "source_artifact_sha256": HASH,
+        "world_id": identity["world_id"],
+        "release_id": identity["release_id"],
+        "source_archive_size": 739, "minecraft_version": "26.3",
+        "protocol": 777, "candidate_player": dict(client),
+        "postrollback_player": dict(client),
+        "mineflayer_offline_protocol_qualified": True,
+        "player_caused_datapack_effect": True,
+        "same_player_action_without_datapack_no_effect": True,
+        "rollback_exact_snapshot_before_restart": True,
+        "baseline_world_sha256": B, "candidate_world_sha256": C,
+        "restored_world_sha256": B,
+        "stock_mojang_client_qualified": False,
+        "authenticated_account_qualified": False,
+        "collage_deployed": False, "truenas_deployed": False,
+        "human_automation_agent_parity_qualified": False,
+        "full_two_rivers_world_qualified": False,
+        "operational_selection": False,
+        "physical_truenas_apply": "HOLD",
+    }
+    return identity, plans, player
+
+
+class PlayerCorrelationTests(unittest.TestCase):
+    def test_positive_still_makes_no_managed_deployment_claim(self):
+        result = correlate(*fixture())
+        self.assertTrue(result["offline_client_action_independently_verified"])
+        self.assertEqual(result["audience_kinds"], ["agent","automation","human"])
+        self.assertFalse(result["collage_managed_deployment"])
+        self.assertFalse(result["principal_authorization_verified"])
+
+    def test_wrong_producer_world_version_archive_and_hash_refused(self):
+        for i,k,v in (
+            (0,"sha256","0"*64),
+            (1,"candidate",dict(fixture()[1]["candidate"],world_id="wrong")),
+            (2,"source_artifact_sha256","0"*64),
+            (2,"minecraft_version","26.4"),
+            (2,"source_archive_size",50),
+            (2,"protocol",776),
+        ):
+            triplet=copy.deepcopy(fixture())
+            triplet[i][k]=v
+            with self.subTest(field=k),self.assertRaises(Refused):
+                correlate(*triplet)
+
+    def test_missing_actor_and_forbidden_deployment_authority(self):
+        d=copy.deepcopy(fixture())
+        d[1]["audience_receipts"].pop("agent")
+        with self.assertRaises(Refused):
+            correlate(*d)
+        d=copy.deepcopy(fixture())
+        d[1]["mutation_authorized"]=True
+        with self.assertRaises(Refused):
+            correlate(*d)
+
+    def test_bot_login_join_and_placement_cannot_be_claimed(self):
+        for player_kind in ("candidate_player","postrollback_player"):
+            for key,value in (
+                ("server_join_independently_observed",False),
+                ("client_saw_redstone_after",False),
+                ("protocol",774),
+                ("action","claimed_player_action"),
+                ("offline_mode",False),
+            ):
+                d=copy.deepcopy(fixture())
+                d[2][player_kind][key]=value
+                with self.subTest(kind=player_kind,field=key),self.assertRaises(Refused):
+                    correlate(*d)
+
+    def test_rollback_and_unauthorized_promotion_refused(self):
+        for key,value in (
+            ("same_player_action_without_datapack_no_effect",False),
+            ("baseline_world_sha256","3"*64),
+            ("stock_mojang_client_qualified",True),
+            ("authenticated_account_qualified",True),
+            ("collage_deployed",True),
+            ("truenas_deployed",True),
+            ("operational_selection",True),
+            ("physical_truenas_apply","APPLY"),
+        ):
+            d=copy.deepcopy(fixture())
+            d[2][key]=value
+            with self.subTest(key=key),self.assertRaises(Refused):
+                correlate(*d)
+
+
+if __name__ == "__main__":
+    unittest.main()
