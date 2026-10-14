@@ -28,7 +28,8 @@ def require(ok: bool, cause: str) -> None:
 
 
 def correlate(manifest: dict, source: dict, player: dict, *,
-              native_source: dict | None = None) -> dict:
+              native_source: dict | None = None,
+              native_guest: dict | None = None) -> dict:
     require(all(type(x) is dict for x in (manifest, source, player)),
             "RECEIPT_NOT_OBJECT")
     require(manifest.get("producer") == PRODUCER and
@@ -132,6 +133,76 @@ def correlate(manifest: dict, source: dict, player: dict, *,
                 native_source.get("world_activated") is False and
                 native_source.get("mutation_authorized") is False,
                 "NATIVE_SOURCE_FALSE_LIVE_DEPLOYMENT_CLAIM")
+    if native_guest is not None:
+        # Cross-lane correlation binds actual native guest receipts to the
+        # very same exact ZIP as the 3 intents and the separate real player.
+        # This is NOT a game-client action in the native TrueNAS guest.
+        require(native_source is not None, "NATIVE_GUEST_NEEDS_EXACT_SOURCE_PLAN")
+        require(type(native_guest) is dict and
+                native_guest.get("contract") == "gha-kvm-system-lab/v1" and
+                native_guest.get("classification") == "SUPPORTED" and
+                native_guest.get("oracleSatisfied") is True and
+                native_guest.get("phase") == "foundry-materialization",
+                "NATIVE_GUEST_ROOT_NOT_QUALIFIED")
+        guest_target = native_guest.get("target") or {}
+        require(type(guest_target) is dict and
+                guest_target.get("product") == "truenas" and
+                guest_target.get("version") == "25.04.2.6" and
+                guest_target.get("rung") == "T6",
+                "NATIVE_GUEST_TARGET_NOT_EXACT")
+        stage = (native_guest.get("foundry_materialization") or {})
+        require(type(stage) is dict and
+                stage.get("schema") == "truenas-minecraft-vanilla263-t6/v1" and
+                stage.get("classification") == "SUPPORTED" and
+                stage.get("oracleSatisfied") is True and
+                stage.get("control_sha256") ==
+                    "c1d6d9bd6306de55b12072ea9d0d6411fa7d7f106a6a87bdbe1913c0d82c0615" and
+                stage.get("foundry_ref") ==
+                    "29ec6cba7df51e316b0329926aa85807805dd07b",
+                "NATIVE_GUEST_FOUNDRY_IDENTITY_DRIFT")
+        zip_stage = stage.get("lantern_artifact_stage") or {}
+        require(type(zip_stage) is dict and
+                zip_stage.get("schema") ==
+                    "supracraft.native-vanilla263-lantern-artifact-stage/1" and
+                zip_stage.get("classification") ==
+                    "REAL_NATIVE_GUEST_ARTIFACT_BYTES_STAGED" and
+                zip_stage.get("artifact_sha256") == manifest["sha256"] and
+                zip_stage.get("download_readback_sha256") == manifest["sha256"] and
+                zip_stage.get("artifact_size") == manifest["archive_size"] and
+                zip_stage.get("world_id") == manifest["world_id"] and
+                zip_stage.get("release_id") == manifest["release_id"] and
+                zip_stage.get("native_app") ==
+                    "rdte-t6-minecraft-vanilla-263" and
+                zip_stage.get("native_truenas_version") == "25.04.2.6" and
+                zip_stage.get("app_quiesced_before_write") is True and
+                zip_stage.get("persisted_on_restart") is True and
+                zip_stage.get("persisted_on_reinstall") is True and
+                zip_stage.get("artifact_gameplay_effect_verified") is False and
+                zip_stage.get("collage_managed_deployment") is False and
+                zip_stage.get("principal_authorized_to_apply") is False and
+                zip_stage.get("physical_truenas_apply") == "HOLD",
+                "NATIVE_GUEST_EXACT_ARTIFACT_STAGE_NOT_QUALIFIED")
+        readback = stage.get("collage_readback") or {}
+        require(type(readback) is dict and
+                readback.get("classification") == "PROVIDER_READBACK_MATCH" and
+                readback.get("source_profile") == "vanilla263" and
+                readback.get("source_sha") ==
+                    "2b6abe1141e65b8c6872eeba6c8ae39f5a9635f8" and
+                readback.get("native_app") == zip_stage["native_app"] and
+                readback.get("world_id") == manifest["world_id"] and
+                readback.get("credential_scope") == "APPS_READ" and
+                readback.get("transport") == "isolated_guest_tls_verified" and
+                readback.get("observation_mutation_count") == 0 and
+                readback.get("ownership_fields_matched") == 6 and
+                readback.get("world_activated") is False and
+                readback.get("physical_true_nas_mutated") is False,
+                "NATIVE_GUEST_SCOPED_PROVIDER_OBSERVATION_NOT_QUALIFIED")
+        cleanup = stage.get("cleanup") or {}
+        require(type(cleanup) is dict and
+                all(cleanup.get(k) is True for k in (
+                    "attempted","zero_residue","app_absent",
+                    "owned_world_dataset_absent")),
+                "NATIVE_GUEST_CLEANUP_OR_ROLLBACK_UNPROVEN")
     return {
         "schema": "collage.op3d-player-source-correlation/1",
         "classification": "SAME_ARTIFACT_SOURCE_PLANS_AND_INDEPENDENT_REAL_PLAYER_ACTION_CORRELATED",
@@ -143,6 +214,9 @@ def correlate(manifest: dict, source: dict, player: dict, *,
         "source_plan_intent_sha256": source["common_intent_sha256"],
         "audience_kinds": sorted(kinds),
         "native_app_artifact_source_intent_bound": native_source is not None,
+        "native_guest_same_zip_staged_and_read_back": native_guest is not None,
+        "native_guest_app_lifecycle_and_cleanup_correlated": native_guest is not None,
+        "same_native_guest_real_client_gameplay_verified": False,
         "native_app_expected": "rdte-t6-minecraft-vanilla-263" if native_source is not None else None,
         "native_app_source_plan_intent_sha256": (
             native_source["common_intent_sha256"] if native_source is not None else None),
@@ -168,6 +242,7 @@ def main() -> int:
     ap.add_argument("--source-receipt", type=Path, required=True)
     ap.add_argument("--player-receipt", type=Path, required=True)
     ap.add_argument("--native-source-receipt", type=Path)
+    ap.add_argument("--native-guest-receipt", type=Path)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
     try:
@@ -175,7 +250,9 @@ def main() -> int:
                            json.loads(args.source_receipt.read_text()),
                            json.loads(args.player_receipt.read_text()),
                            native_source=(json.loads(args.native_source_receipt.read_text())
-                                          if args.native_source_receipt else None))
+                                          if args.native_source_receipt else None),
+                           native_guest=(json.loads(args.native_guest_receipt.read_text())
+                                         if args.native_guest_receipt else None))
         exit_code = 0
     except (OSError, ValueError, KeyError, Refused) as exc:
         result = {
