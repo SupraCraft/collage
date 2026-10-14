@@ -32,6 +32,11 @@ SHA = re.compile(r"^[0-9a-f]{64}$")
 PRODUCER = re.compile(r"^SupraCraft/mc-server-images@[0-9a-f]{40}$")
 REALM = "d68a14b9-2a1c-4e83-a452-e3b569cdf93e"
 SERVICE = "11111111-1111-4111-8111-111111111111"
+NATIVE_VANILLA263_PRODUCER = "SupraCraft/mc-server-images@7f888b5829f4e5576d5ce512d86327348c43f01e"
+NATIVE_VANILLA263_APP = "rdte-t6-minecraft-vanilla-263"
+NATIVE_VANILLA263_WORLD = "lantern-rdte"
+NATIVE_VANILLA263_RELEASE = "lantern-core-restore-26-3"
+NATIVE_VANILLA263_VERSION = "25.04.2.6"
 
 
 def require(ok: bool, reason: str) -> None:
@@ -116,13 +121,25 @@ def verify_candidate(manifest: dict, zip_path: pathlib.Path) -> dict:
     }
 
 
-def audience_requests(candidate: dict, relative_path: str) -> list[dict]:
+def audience_requests(candidate: dict, relative_path: str, *,
+                      native_vanilla263: bool = False) -> list[dict]:
+    # An actual native guest has now been qualified, but these source plans
+    # remain read-only and do not inherit its live App or world proof.
+    if native_vanilla263:
+        require(candidate["producer"] == NATIVE_VANILLA263_PRODUCER
+                and candidate["world_id"] == NATIVE_VANILLA263_WORLD
+                and candidate["release_id"] == NATIVE_VANILLA263_RELEASE
+                and candidate["minecraft_version"] == "26.3"
+                and candidate["kind"] == "datapack",
+                "EXACT_NATIVE_SOURCE_PROFILE_MISMATCH")
+    deployment = (NATIVE_VANILLA263_APP if native_vanilla263
+                  else "lantern-rdte-candidate")
     base = {
         "schema": "collage.deployment-request/1",
         "realm_id": REALM, "environment": "rdte", "action": "plan",
         "ttl_seconds": 3600, "expected_current_release": None,
         "authorization": {"audience_realm_id": REALM, "claimed_scopes": ["deploy:plan"]},
-        "target": {"provider": "truenas", "deployment_id": "lantern-rdte-candidate",
+        "target": {"provider": "truenas", "deployment_id": deployment,
                    "service_id": SERVICE, "world_id": candidate["world_id"],
                    "minecraft_version": "26.3", "backend": "vanilla",
                    "purpose": "two-rivers"},
@@ -151,13 +168,15 @@ def audience_requests(candidate: dict, relative_path: str) -> list[dict]:
     return requests
 
 
-def consume(manifest: dict, zip_path: pathlib.Path, artifact_root: pathlib.Path) -> dict:
+def consume(manifest: dict, zip_path: pathlib.Path, artifact_root: pathlib.Path, *,
+            native_vanilla263: bool = False) -> dict:
     candidate = verify_candidate(manifest, zip_path)
     root = artifact_root.resolve()
     absolute = zip_path.resolve()
     require(absolute.is_relative_to(root), "CANDIDATE_OUTSIDE_ARTIFACT_ROOT")
     relative = absolute.relative_to(root).as_posix()
-    requests = audience_requests(candidate, relative)
+    requests = audience_requests(candidate, relative,
+                                 native_vanilla263=native_vanilla263)
     receipts = [plan(r, root) for r in requests]
     require(all(r["classification"] == "SOURCE_VALIDATED"
                 and r["mutation_authorized"] is False
@@ -181,7 +200,13 @@ def consume(manifest: dict, zip_path: pathlib.Path, artifact_root: pathlib.Path)
         "world_activated": False,
         "minecraft_runtime_qualified_by_this_step": False,
         "mutation_authorized": False,
-        "next_gate": "DISPOSABLE_VANILLA_WORLD_STAGE_AND_INDEPENDENT_GAMEPLAY_ORACLE",
+        "source_native_target_profile": "vanilla263-250426" if native_vanilla263 else None,
+        "expected_native_app": NATIVE_VANILLA263_APP if native_vanilla263 else None,
+        "expected_truenas_version": NATIVE_VANILLA263_VERSION if native_vanilla263 else None,
+        "native_guest_with_this_artifact_qualified": False,
+        "next_gate": ("REAL_TLS_VERIFIED_NATIVE_APP_PROVIDER_READBACK"
+                      if native_vanilla263 else
+                      "DISPOSABLE_VANILLA_WORLD_STAGE_AND_INDEPENDENT_GAMEPLAY_ORACLE"),
     }
 
 
@@ -190,10 +215,12 @@ def main() -> int:
     ap.add_argument("--manifest", type=pathlib.Path, required=True)
     ap.add_argument("--artifact", type=pathlib.Path, required=True)
     ap.add_argument("--artifact-root", type=pathlib.Path, required=True)
+    ap.add_argument("--native-target-profile", choices=("vanilla263-250426",))
     args = ap.parse_args()
     try:
         print(json.dumps(consume(read_json(args.manifest),
-                                 args.artifact, args.artifact_root),
+                                 args.artifact, args.artifact_root,
+                                 native_vanilla263=(args.native_target_profile == "vanilla263-250426")),
                          sort_keys=True, indent=2))
         return 0
     except Refused as exc:
