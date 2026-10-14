@@ -73,7 +73,7 @@ class ComparisonTests(unittest.TestCase):
         request["artifact"].update(world_id="lantern-rdte",
                                    minecraft_version="26.3",kind="datapack")
         readback=sanitized_readback()
-        readback.update(truenas_version="25.04.2.6",
+        readback.update(truenas_version="TrueNAS-25.04.2.6",
                         app_version="1.15.30",
                         app_name="rdte-t6-minecraft-vanilla-263")
         readback["collage_metadata"]["SUPRACRAFT_COLLAGE_WORLD_ID"]="lantern-rdte"
@@ -82,6 +82,9 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(matched["truenas_version"],"25.04.2.6")
         self.assertEqual(matched["ownership_fields_matched"],6)
         for field,bad in [("truenas_version","25.04.1"),
+                          ("truenas_version","25.04.2.6"),
+                          ("truenas_version","TrueNAS-SCALE-25.04.2.6"),
+                          ("truenas_version","TrueNAS-25.04.2.60"),
                           ("app_version","1.15.29"),
                           ("container_count",0)]:
             candidate=copy.deepcopy(readback)

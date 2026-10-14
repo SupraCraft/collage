@@ -61,7 +61,13 @@ def compare_native(request: dict, observed: object,
     if (artifact["world_id"] != target["world_id"]
             or artifact["minecraft_version"] != target["minecraft_version"]):
         raise Refused("ARTIFACT_TARGET_DRIFT")
-    if target["deployment_id"] == "rdte-t6-minecraft-vanilla-263":
+    native_vanilla263 = target["deployment_id"] == "rdte-t6-minecraft-vanilla-263"
+    if native_vanilla263:
+        # The exact pinned Go truenas-go v0.5.0 WS client exposes
+        # ws.Version().Raw == system.version, e.g. TrueNAS-25.04.2.6,
+        # NOT the unprefixed numeric target version. Check exact raw bytes
+        # before normalizing the result for COLLAGE's source target schema.
+        # Do not accept suffixes, alternate products, or fuzzy version ranges.
         # This concrete native T6 target was actually qualified separately
         # (Agent Dispatch public run 38489327594, 25.04.2.6/1.15.30).
         # Source identity and native App ownership may not silently drift,
@@ -72,7 +78,7 @@ def compare_native(request: dict, observed: object,
                 or target["minecraft_version"] != "26.3"
                 or artifact.get("kind") != "datapack"):
             raise Refused("NATIVE_VANILLA263_TARGET_PROFILE_DRIFT")
-        if (observed["truenas_version"] != "25.04.2.6"
+        if (observed["truenas_version"] != "TrueNAS-25.04.2.6"
                 or observed["app_version"] != "1.15.30"
                 or type(observed["container_count"]) is not int
                 or observed["container_count"] < 1):
@@ -80,7 +86,7 @@ def compare_native(request: dict, observed: object,
     return {
         "native_app": target["deployment_id"],
         "native_app_version": observed["app_version"],
-        "truenas_version": observed["truenas_version"],
+        "truenas_version": "25.04.2.6" if native_vanilla263 else observed["truenas_version"],
         "world_id": target["world_id"],
         "service_id": target["service_id"],
         "ownership_fields_matched": len(expected),
