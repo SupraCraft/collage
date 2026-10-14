@@ -128,7 +128,97 @@ def native_guest_fixture():
     }
 
 
+def native_g3_rollback_fixture():
+    guest=native_guest_fixture()
+    p=guest["foundry_materialization"]
+    p["native_world_rollback"]={
+        "schema":"supracraft.native-vanilla263-rdte-rollback-mechanics/1",
+        "classification":"G3_DISPOSABLE_MECHANICS_ONLY",
+        "phase":"injected_fault_rolled_back",
+        "snapshot_owned":True,"snapshot_id_verified":True,
+        "release_fault_injected":True,
+        "candidate_absent_after_rollback":True,
+        "native_app_running_after_rollback":True,
+        "native_game_status_rechecked":True,
+        "candidate_present_before_stage":False,
+        "candidate_sha256":HASH,
+        "collage_managed_deployment":False,
+        "world_activation_authorized_by_collage":False,
+        "actual_player_gameplay_verified":False,
+        "physical_true_nas_mutated":False,
+    }
+    p["readiness"]={"g3-rollback":{
+        "protocol":{"oracleSatisfied":True,"server_implementation":"vanilla",
+                    "java_version":"26.3","server_protocol":777,
+                    "status_packet_valid":True},
+        "level":{"size":396},
+    }}
+    return guest
+
+
 class PlayerCorrelationTests(unittest.TestCase):
+    def test_g3_real_native_snapshot_rollback_join_never_promotes_apply_or_gameplay(self):
+        native=native_g3_rollback_fixture()
+        result=correlate(*fixture(),native_source=native_fixture(),
+                         native_guest=native,require_native_rollback=True)
+        self.assertTrue(result["native_guest_owned_snapshot_rollback_correlated"])
+        self.assertTrue(result["native_guest_same_zip_staged_and_read_back"])
+        self.assertFalse(result["same_native_guest_real_client_gameplay_verified"])
+        self.assertFalse(result["native_artifact_activation_performed"])
+        self.assertFalse(result["principal_authorization_verified"])
+        self.assertFalse(result["collage_managed_deployment"])
+        self.assertFalse(result["truenas_provider_observed"])
+        self.assertEqual(result["physical_true_nas_apply"],"HOLD")
+
+    def test_g3_missing_guest_or_snapshot_cannot_satisfy_required_join(self):
+        with self.assertRaisesRegex(Refused,"NATIVE_ROLLBACK_NEEDS_REAL_GUEST_RECEIPT"):
+            correlate(*fixture(),native_source=native_fixture(),
+                      require_native_rollback=True)
+        for required in (True,False):
+            baseline=native_guest_fixture()
+            if required:
+                with self.assertRaisesRegex(Refused,"NATIVE_ROLLBACK_MECHANICS_NOT_QUALIFIED"):
+                    correlate(*fixture(),native_source=native_fixture(),
+                              native_guest=baseline,require_native_rollback=True)
+            else:
+                result=correlate(*fixture(),native_source=native_fixture(),
+                                 native_guest=baseline)
+                self.assertFalse(result["native_guest_owned_snapshot_rollback_correlated"])
+
+    def test_g3_forgery_negative_different_world_fault_and_authority(self):
+        for section,field,value in (
+            ("native_world_rollback","snapshot_owned",False),
+            ("native_world_rollback","snapshot_id_verified",False),
+            ("native_world_rollback","candidate_sha256","f"*64),
+            ("native_world_rollback","phase","source_only"),
+            ("native_world_rollback","candidate_present_before_stage",True),
+            ("native_world_rollback","release_fault_injected",False),
+            ("native_world_rollback","candidate_absent_after_rollback",False),
+            ("native_world_rollback","collage_managed_deployment",True),
+            ("native_world_rollback","world_activation_authorized_by_collage",True),
+            ("native_world_rollback","actual_player_gameplay_verified",True),
+            ("native_world_rollback","physical_true_nas_mutated",True),
+            ("protocol","server_protocol",774),
+            ("protocol","oracleSatisfied",False),
+            ("level","size",0),
+        ):
+            bad=native_g3_rollback_fixture()
+            p=bad["foundry_materialization"]
+            if section=="native_world_rollback":
+                p[section][field]=value
+            elif section=="protocol":
+                p["readiness"]["g3-rollback"]["protocol"][field]=value
+            elif section=="level":
+                p["readiness"]["g3-rollback"]["level"][field]=value
+            with self.subTest(section=section,field=field):
+                with self.assertRaises(Refused):
+                    correlate(*fixture(),native_source=native_fixture(),
+                              native_guest=bad,require_native_rollback=True)
+                # Even when OPTIONAL a supplied corrupt G3 receipt fails closed.
+                with self.assertRaises(Refused):
+                    correlate(*fixture(),native_source=native_fixture(),
+                              native_guest=bad)
+
     def test_native_guest_exact_artifact_join_is_not_same_guest_client_or_authority(self):
         result=correlate(*fixture(),native_source=native_fixture(),
                          native_guest=native_guest_fixture())
