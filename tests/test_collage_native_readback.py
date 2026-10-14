@@ -66,6 +66,45 @@ class ComparisonTests(unittest.TestCase):
         self.assertNotIn("player_authenticated", matched)
         self.assertNotIn("world_activated", matched)
 
+    def test_exact_native_vanilla263_250426_source_to_provider_policy_only(self):
+        request=source()
+        request["target"].update(deployment_id="rdte-t6-minecraft-vanilla-263",
+                                 world_id="lantern-rdte",minecraft_version="26.3")
+        request["artifact"].update(world_id="lantern-rdte",
+                                   minecraft_version="26.3",kind="datapack")
+        readback=sanitized_readback()
+        readback.update(truenas_version="25.04.2.6",
+                        app_version="1.15.30",
+                        app_name="rdte-t6-minecraft-vanilla-263")
+        readback["collage_metadata"]["SUPRACRAFT_COLLAGE_WORLD_ID"]="lantern-rdte"
+        matched=compare_native(request,readback,REALM,MANAGER,FLEET)
+        self.assertEqual(matched["native_app"],"rdte-t6-minecraft-vanilla-263")
+        self.assertEqual(matched["truenas_version"],"25.04.2.6")
+        self.assertEqual(matched["ownership_fields_matched"],6)
+        for field,bad in [("truenas_version","25.04.1"),
+                          ("app_version","1.15.29"),
+                          ("container_count",0)]:
+            candidate=copy.deepcopy(readback)
+            candidate[field]=bad
+            with self.subTest(field=field):
+                self.reject(request,candidate,"NATIVE_VANILLA263_GUEST_PROFILE_DRIFT")
+        for key,bad in [("minecraft_version","1.21.11"),
+                        ("world_id","foreign-world")]:
+            changed=copy.deepcopy(request)
+            changed["target"][key]=bad
+            if key=="world_id":
+                changed["artifact"]["world_id"]=bad
+                candidate=copy.deepcopy(readback)
+                candidate["collage_metadata"]["SUPRACRAFT_COLLAGE_WORLD_ID"]=bad
+            else:
+                changed["artifact"]["minecraft_version"]=bad
+                candidate=readback
+            with self.subTest(key=key):
+                self.reject(changed,candidate,"NATIVE_VANILLA263_TARGET_PROFILE_DRIFT")
+        changed=copy.deepcopy(request)
+        changed["artifact"]["kind"]="world-save"
+        self.reject(changed,readback,"NATIVE_VANILLA263_TARGET_PROFILE_DRIFT")
+
     def test_missing_stable_uuid_refuses(self):
         req = source()
         del req["target"]["service_id"]

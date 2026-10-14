@@ -70,6 +70,32 @@ jobs:
           assert not doc["world_activated"]
           assert not doc["mutation_authorized"]
           PY
+      - name: Bind the same real ZIP to the actually qualified native vanilla 26.3 App without APPLY
+        run: |
+          set -euo pipefail
+          python3 tools/consume_vanilla_datapack_source.py \
+            --manifest "$RUNNER_TEMP/collage-artifact/lantern-restoration-26.3.json" \
+            --artifact "$RUNNER_TEMP/collage-artifact/lantern-restoration-26.3.zip" \
+            --artifact-root "$RUNNER_TEMP/collage-artifact" \
+            --native-target-profile vanilla263-250426 \
+            > "$RUNNER_TEMP/collage-artifact/native-source-binding.json"
+          python3 - "$RUNNER_TEMP/collage-artifact/native-source-binding.json" \
+            "$RUNNER_TEMP/collage-artifact/consumer-receipt.json" <<'PY'
+          import json,sys
+          native=json.load(open(sys.argv[1]))
+          default=json.load(open(sys.argv[2]))
+          assert native["classification"]=="SOURCE_ARTIFACT_AND_INTENT_PARITY_VALIDATED"
+          assert native["source_native_target_profile"]=="vanilla263-250426"
+          assert native["expected_native_app"]=="rdte-t6-minecraft-vanilla-263"
+          assert native["expected_truenas_version"]=="25.04.2.6"
+          assert native["candidate"]==default["candidate"]
+          assert native["common_intent_sha256"]!=default["common_intent_sha256"]
+          assert set(native["audience_receipts"])=={"human","automation","agent"}
+          assert native["real_provider_readback"] is False
+          assert native["native_guest_with_this_artifact_qualified"] is False
+          assert native["world_activated"] is False
+          assert native["mutation_authorized"] is False
+          PY
       - name: Upload public source-only evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
