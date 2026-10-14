@@ -86,6 +86,22 @@ Its `PROVIDER_READBACK_MATCH` means only that **this process ran the approved au
 
 This runtime join **has not yet been executed in the disposable KVM guest**. Its real-system acceptance is tracked in [public COLLAGE issue #19](https://github.com/SupraCraft/collage/issues/19). The checked-in example fixture is deliberately non-playable; it must not be used to infer a successful Two Rivers deployment.
 
+## Exact native vanilla26.3 source-to-owner binding (opt-in, source-only)
+
+Public disposable [Agent Dispatch KVM run 38489327594](https://github.com/SemperSupra/agent-dispatch/actions/runs/38489327594) independently accepted **TrueNAS 25.04.2.6 / native community Minecraft 1.15.30 / Java25 vanilla26.3 protocol777**, App `rdte-t6-minecraft-vanilla-263`, source owner service UUID `11111111-1111-4111-8111-111111111111`, world `lantern-rdte`, with native App lifecycle, world retain/reinstall, and zero residue. That run did **not** stage the Lantern restoration datapack through COLLAGE and did not execute this read-only Go readback adapter.
+
+The existing real-artifact consumer now accepts optional `--native-target-profile vanilla263-250426`. This binds its **already verified real ZIP**, from exact producer `SupraCraft/mc-server-images@7f888b5829f4e5576d5ce512d86327348c43f01e`, to that native App's **expected identity** within the same human/automation/agent source-plan semantics. Without the flag, the prior source-only `lantern-rdte-candidate` plan remains unchanged. It refuses a different world/release/producer instead of guessing. The existing `collage_native_readback.py` comparison also refuses wrong TrueNAS 25.04.2.6, native App catalog version 1.15.30, expected service/world ID, or missing container when this native deployment ID is requested; legacy Paper controls are unchanged.
+
+```sh
+python3 tools/consume_vanilla_datapack_source.py \
+  --manifest /path/to/lantern-restoration-26.3.json \
+  --artifact /path/to/lantern-restoration-26.3.zip \
+  --artifact-root /path/to \
+  --native-target-profile vanilla263-250426
+```
+
+**This is still SOURCE_ARTIFACT_AND_INTENT_PARITY_VALIDATED**, not live provider readback. Native App identity is an expected source binding; a supplied sanitized provider document in tests cannot prove live state. Next live gate must invoke the existing **independent authenticated/TLS-verified read-only Go probe** during a separately admitted disposable guest lifecycle and compare actual App ownership, then run separately admitted world activation and gameplay tests. Never promote source actor claims into authorization or deploy/activate the world based only on this output. No physical TrueNAS APPLY.
+
 ## Next live executable increments (do not promote source proof)
 
 1. Admit a public-only Agent Dispatch nested TrueNAS request **separate** from the accepted standalone Paper T6 fixture; do not blindly rerun existing heavy proofs.
