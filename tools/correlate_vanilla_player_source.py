@@ -27,7 +27,8 @@ def require(ok: bool, cause: str) -> None:
         raise Refused(cause)
 
 
-def correlate(manifest: dict, source: dict, player: dict) -> dict:
+def correlate(manifest: dict, source: dict, player: dict, *,
+              native_source: dict | None = None) -> dict:
     require(all(type(x) is dict for x in (manifest, source, player)),
             "RECEIPT_NOT_OBJECT")
     require(manifest.get("producer") == PRODUCER and
@@ -103,6 +104,34 @@ def correlate(manifest: dict, source: dict, player: dict) -> dict:
             player.get("operational_selection") is False and
             player.get("physical_truenas_apply") == "HOLD",
             "UNSUPPORTED_PROVIDER_IAM_OR_OPERATIONAL_CLAIM")
+    if native_source is not None:
+        # An independently validated native-target plan is source-only.
+        # Its artifact identity MUST match both the generic COLLAGE plan
+        # and the real player-used ZIP; no guest deployment inferred.
+        require(type(native_source) is dict and
+                native_source.get("schema") == source["schema"] and
+                native_source.get("classification") == source["classification"] and
+                native_source.get("candidate") == candidate and
+                native_source.get("source_native_target_profile") ==
+                    "vanilla263-250426" and
+                native_source.get("expected_native_app") ==
+                    "rdte-t6-minecraft-vanilla-263" and
+                native_source.get("expected_truenas_version") == "25.04.2.6",
+                "NATIVE_SOURCE_ARTIFACT_OR_TARGET_MISMATCH")
+        ns_kinds = native_source.get("audience_receipts")
+        require(type(ns_kinds) is dict and set(ns_kinds) == AUDIENCES and
+                all(type(x) is dict and x.get("source_classification") ==
+                    "SOURCE_VALIDATED" for x in ns_kinds.values()) and
+                isinstance(native_source.get("common_intent_sha256"), str) and
+                SHA.fullmatch(native_source["common_intent_sha256"]) and
+                native_source["common_intent_sha256"] !=
+                    source["common_intent_sha256"],
+                "NATIVE_SOURCE_AUDIENCE_OR_TARGET_INTENT_DRIFT")
+        require(native_source.get("real_provider_readback") is False and
+                native_source.get("native_guest_with_this_artifact_qualified") is False and
+                native_source.get("world_activated") is False and
+                native_source.get("mutation_authorized") is False,
+                "NATIVE_SOURCE_FALSE_LIVE_DEPLOYMENT_CLAIM")
     return {
         "schema": "collage.op3d-player-source-correlation/1",
         "classification": "SAME_ARTIFACT_SOURCE_PLANS_AND_INDEPENDENT_REAL_PLAYER_ACTION_CORRELATED",
@@ -113,6 +142,12 @@ def correlate(manifest: dict, source: dict, player: dict) -> dict:
         "release_id": manifest["release_id"],
         "source_plan_intent_sha256": source["common_intent_sha256"],
         "audience_kinds": sorted(kinds),
+        "native_app_artifact_source_intent_bound": native_source is not None,
+        "native_app_expected": "rdte-t6-minecraft-vanilla-263" if native_source is not None else None,
+        "native_app_source_plan_intent_sha256": (
+            native_source["common_intent_sha256"] if native_source is not None else None),
+        "native_guest_with_artifact_qualified": False,
+        "native_artifact_activation_performed": False,
         "offline_client_action_independently_verified": True,
         "real_vanilla_datapack_consequence_verified": True,
         "postrollback_same_action_does_not_trigger_datapack": True,
@@ -132,12 +167,15 @@ def main() -> int:
     ap.add_argument("--manifest", type=Path, required=True)
     ap.add_argument("--source-receipt", type=Path, required=True)
     ap.add_argument("--player-receipt", type=Path, required=True)
+    ap.add_argument("--native-source-receipt", type=Path)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
     try:
         result = correlate(json.loads(args.manifest.read_text()),
                            json.loads(args.source_receipt.read_text()),
-                           json.loads(args.player_receipt.read_text()))
+                           json.loads(args.player_receipt.read_text()),
+                           native_source=(json.loads(args.native_source_receipt.read_text())
+                                          if args.native_source_receipt else None))
         exit_code = 0
     except (OSError, ValueError, KeyError, Refused) as exc:
         result = {
