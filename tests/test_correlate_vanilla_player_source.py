@@ -63,7 +63,50 @@ def fixture():
     return identity, plans, player
 
 
+def native_fixture():
+    source=copy.deepcopy(fixture()[1])
+    source.update({
+        "source_native_target_profile": "vanilla263-250426",
+        "expected_native_app": "rdte-t6-minecraft-vanilla-263",
+        "expected_truenas_version": "25.04.2.6",
+        "common_intent_sha256": "e"*64,
+        "native_guest_with_this_artifact_qualified": False,
+    })
+    return source
+
+
 class PlayerCorrelationTests(unittest.TestCase):
+    def test_same_real_artifact_across_generic_native_source_and_player_oracle(self):
+        result=correlate(*fixture(),native_source=native_fixture())
+        self.assertTrue(result["native_app_artifact_source_intent_bound"])
+        self.assertEqual(result["native_app_expected"],"rdte-t6-minecraft-vanilla-263")
+        self.assertEqual(result["native_app_source_plan_intent_sha256"],"e"*64)
+        self.assertTrue(result["offline_client_action_independently_verified"])
+        self.assertFalse(result["native_guest_with_artifact_qualified"])
+        self.assertFalse(result["native_artifact_activation_performed"])
+        self.assertFalse(result["collage_managed_deployment"])
+
+    def test_native_source_anti_promotion_identity_and_three_audience_negatives(self):
+        for key,value in (
+            ("candidate",dict(native_fixture()["candidate"],sha256="a"*64)),
+            ("expected_native_app","rdte-t6-minecraft-paper"),
+            ("expected_truenas_version","25.04.1"),
+            ("source_native_target_profile","unbounded"),
+            ("common_intent_sha256","f"*64),
+            ("real_provider_readback",True),
+            ("world_activated",True),
+            ("mutation_authorized",True),
+            ("native_guest_with_this_artifact_qualified",True),
+        ):
+            candidate=native_fixture()
+            candidate[key]=value
+            with self.subTest(key=key),self.assertRaises(Refused):
+                correlate(*fixture(),native_source=candidate)
+        candidate=native_fixture()
+        candidate["audience_receipts"].pop("agent")
+        with self.assertRaises(Refused):
+            correlate(*fixture(),native_source=candidate)
+
     def test_positive_still_makes_no_managed_deployment_claim(self):
         result = correlate(*fixture())
         self.assertTrue(result["offline_client_action_independently_verified"])
