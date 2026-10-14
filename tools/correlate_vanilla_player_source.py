@@ -29,7 +29,8 @@ def require(ok: bool, cause: str) -> None:
 
 def correlate(manifest: dict, source: dict, player: dict, *,
               native_source: dict | None = None,
-              native_guest: dict | None = None) -> dict:
+              native_guest: dict | None = None,
+              require_native_rollback: bool = False) -> dict:
     require(all(type(x) is dict for x in (manifest, source, player)),
             "RECEIPT_NOT_OBJECT")
     require(manifest.get("producer") == PRODUCER and
@@ -133,6 +134,9 @@ def correlate(manifest: dict, source: dict, player: dict, *,
                 native_source.get("world_activated") is False and
                 native_source.get("mutation_authorized") is False,
                 "NATIVE_SOURCE_FALSE_LIVE_DEPLOYMENT_CLAIM")
+    require(not require_native_rollback or native_guest is not None,
+            "NATIVE_ROLLBACK_NEEDS_REAL_GUEST_RECEIPT")
+    native_rollback_correlated = False
     if native_guest is not None:
         # Cross-lane correlation binds actual native guest receipts to the
         # very same exact ZIP as the 3 intents and the separate real player.
@@ -197,6 +201,39 @@ def correlate(manifest: dict, source: dict, player: dict, *,
                 readback.get("world_activated") is False and
                 readback.get("physical_true_nas_mutated") is False,
                 "NATIVE_GUEST_SCOPED_PROVIDER_OBSERVATION_NOT_QUALIFIED")
+        rollback = stage.get("native_world_rollback")
+        if rollback is not None or require_native_rollback:
+            require(type(rollback) is dict and
+                    rollback.get("schema") ==
+                       "supracraft.native-vanilla263-rdte-rollback-mechanics/1" and
+                    rollback.get("classification") == "G3_DISPOSABLE_MECHANICS_ONLY" and
+                    rollback.get("phase") == "injected_fault_rolled_back" and
+                    all(rollback.get(k) is True for k in (
+                        "snapshot_owned", "snapshot_id_verified",
+                        "release_fault_injected", "candidate_absent_after_rollback",
+                        "native_app_running_after_rollback",
+                        "native_game_status_rechecked")) and
+                    rollback.get("candidate_present_before_stage") is False and
+                    rollback.get("candidate_sha256") == manifest["sha256"] and
+                    all(rollback.get(k) is False for k in (
+                        "collage_managed_deployment",
+                        "world_activation_authorized_by_collage",
+                        "actual_player_gameplay_verified",
+                        "physical_true_nas_mutated")),
+                    "NATIVE_ROLLBACK_MECHANICS_NOT_QUALIFIED")
+            readiness = stage.get("readiness") or {}
+            restored = readiness.get("g3-rollback") or {}
+            status = restored.get("protocol") or {}
+            level = restored.get("level") or {}
+            require(type(status) is dict and type(level) is dict and
+                    status.get("oracleSatisfied") is True and
+                    status.get("server_implementation") == "vanilla" and
+                    status.get("java_version") == "26.3" and
+                    status.get("server_protocol") == 777 and
+                    status.get("status_packet_valid") is True and
+                    type(level.get("size")) is int and level["size"] > 0,
+                    "NATIVE_ROLLBACK_WORLD_NOT_REQUALIFIED")
+            native_rollback_correlated = True
         cleanup = stage.get("cleanup") or {}
         require(type(cleanup) is dict and
                 all(cleanup.get(k) is True for k in (
@@ -216,6 +253,7 @@ def correlate(manifest: dict, source: dict, player: dict, *,
         "native_app_artifact_source_intent_bound": native_source is not None,
         "native_guest_same_zip_staged_and_read_back": native_guest is not None,
         "native_guest_app_lifecycle_and_cleanup_correlated": native_guest is not None,
+        "native_guest_owned_snapshot_rollback_correlated": native_rollback_correlated,
         "same_native_guest_real_client_gameplay_verified": False,
         "native_app_expected": "rdte-t6-minecraft-vanilla-263" if native_source is not None else None,
         "native_app_source_plan_intent_sha256": (
@@ -243,6 +281,7 @@ def main() -> int:
     ap.add_argument("--player-receipt", type=Path, required=True)
     ap.add_argument("--native-source-receipt", type=Path)
     ap.add_argument("--native-guest-receipt", type=Path)
+    ap.add_argument("--require-native-rollback", action="store_true")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
     try:
@@ -252,7 +291,8 @@ def main() -> int:
                            native_source=(json.loads(args.native_source_receipt.read_text())
                                           if args.native_source_receipt else None),
                            native_guest=(json.loads(args.native_guest_receipt.read_text())
-                                         if args.native_guest_receipt else None))
+                                         if args.native_guest_receipt else None),
+                           require_native_rollback=args.require_native_rollback)
         exit_code = 0
     except (OSError, ValueError, KeyError, Refused) as exc:
         result = {
