@@ -168,7 +168,7 @@ class PlayerCorrelationTests(unittest.TestCase):
         self.assertFalse(result["principal_authorization_verified"])
         self.assertFalse(result["collage_managed_deployment"])
         self.assertFalse(result["truenas_provider_observed"])
-        self.assertEqual(result["physical_true_nas_apply"],"HOLD")
+        self.assertEqual(result["physical_truenas_apply"],"HOLD")
 
     def test_g3_missing_guest_or_snapshot_cannot_satisfy_required_join(self):
         with self.assertRaisesRegex(Refused,"NATIVE_ROLLBACK_NEEDS_REAL_GUEST_RECEIPT"):
