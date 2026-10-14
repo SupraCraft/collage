@@ -72,6 +72,25 @@ jobs:
             --artifact "$RUNNER_TEMP/op3d/lantern-restoration-26.3.zip" \
             --artifact-root "$RUNNER_TEMP/op3d" \
             > "$RUNNER_TEMP/op3d/source-plans.json"
+      - name: Plan same real artifact for exact accepted native vanilla 26.3 App target
+        run: |
+          set -euo pipefail
+          python3 tools/consume_vanilla_datapack_source.py \
+            --manifest "$RUNNER_TEMP/op3d/lantern-restoration-26.3.json" \
+            --artifact "$RUNNER_TEMP/op3d/lantern-restoration-26.3.zip" \
+            --artifact-root "$RUNNER_TEMP/op3d" \
+            --native-target-profile vanilla263-250426 \
+            > "$RUNNER_TEMP/op3d/native-source-plan.json"
+          python3 - "$RUNNER_TEMP/op3d/native-source-plan.json" <<'PY'
+          import json,sys
+          p=json.load(open(sys.argv[1]))
+          assert p["source_native_target_profile"]=="vanilla263-250426"
+          assert p["expected_native_app"]=="rdte-t6-minecraft-vanilla-263"
+          assert p["expected_truenas_version"]=="25.04.2.6"
+          assert p["real_provider_readback"] is False
+          assert p["native_guest_with_this_artifact_qualified"] is False
+          assert p["mutation_authorized"] is False
+          PY
       - name: Independently play core through real vanilla world and rollback
         run: |
           set -euo pipefail
@@ -87,6 +106,7 @@ jobs:
             --manifest "$RUNNER_TEMP/op3d/lantern-restoration-26.3.json" \
             --source-receipt "$RUNNER_TEMP/op3d/source-plans.json" \
             --player-receipt "$RUNNER_TEMP/op3d/player-receipt.json" \
+            --native-source-receipt "$RUNNER_TEMP/op3d/native-source-plan.json" \
             --out "$RUNNER_TEMP/op3d/correlation.json"
           python3 - "$RUNNER_TEMP/op3d/correlation.json" <<'PY'
           import json,sys
@@ -94,6 +114,10 @@ jobs:
           assert r["classification"]=="SAME_ARTIFACT_SOURCE_PLANS_AND_INDEPENDENT_REAL_PLAYER_ACTION_CORRELATED"
           assert set(r["audience_kinds"])=={"human","automation","agent"}
           assert r["artifact_sha256"]=="da25005e8729e6f013f7108ac5b8869dd46323befc78efdae18221b26cafe5f8"
+          assert r["native_app_artifact_source_intent_bound"] is True
+          assert r["native_app_expected"]=="rdte-t6-minecraft-vanilla-263"
+          assert r["native_guest_with_artifact_qualified"] is False
+          assert r["native_artifact_activation_performed"] is False
           assert r["offline_client_action_independently_verified"]
           assert r["real_vanilla_datapack_consequence_verified"]
           assert r["postrollback_same_action_does_not_trigger_datapack"]
@@ -111,6 +135,7 @@ jobs:
           name: collage-op3d-source-player-world-correlation
           path: |
             ${{ runner.temp }}/op3d/source-plans.json
+            ${{ runner.temp }}/op3d/native-source-plan.json
             ${{ runner.temp }}/op3d/player-receipt.json
             ${{ runner.temp }}/op3d/correlation.json
           retention-days: 14
