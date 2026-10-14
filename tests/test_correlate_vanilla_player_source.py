@@ -75,7 +75,93 @@ def native_fixture():
     return source
 
 
+def native_guest_fixture():
+    manifest,_,_=fixture()
+    digest=manifest["sha256"]
+    return {
+        "contract":"gha-kvm-system-lab/v1",
+        "classification":"SUPPORTED",
+        "oracleSatisfied":True,
+        "phase":"foundry-materialization",
+        "target":{"product":"truenas","version":"25.04.2.6","rung":"T6"},
+        "foundry_materialization":{
+            "schema":"truenas-minecraft-vanilla263-t6/v1",
+            "classification":"SUPPORTED","oracleSatisfied":True,
+            "control_sha256":"c1d6d9bd6306de55b12072ea9d0d6411fa7d7f106a6a87bdbe1913c0d82c0615",
+            "foundry_ref":"29ec6cba7df51e316b0329926aa85807805dd07b",
+            "lantern_artifact_stage":{
+                "schema":"supracraft.native-vanilla263-lantern-artifact-stage/1",
+                "classification":"REAL_NATIVE_GUEST_ARTIFACT_BYTES_STAGED",
+                "artifact_sha256":digest,
+                "download_readback_sha256":digest,
+                "artifact_size":manifest["archive_size"],
+                "world_id":manifest["world_id"],
+                "release_id":manifest["release_id"],
+                "native_app":"rdte-t6-minecraft-vanilla-263",
+                "native_truenas_version":"25.04.2.6",
+                "app_quiesced_before_write":True,
+                "persisted_on_restart":True,
+                "persisted_on_reinstall":True,
+                "artifact_gameplay_effect_verified":False,
+                "collage_managed_deployment":False,
+                "principal_authorized_to_apply":False,
+                "physical_truenas_apply":"HOLD",
+            },
+            "collage_readback":{
+                "classification":"PROVIDER_READBACK_MATCH",
+                "source_profile":"vanilla263",
+                "source_sha":"2b6abe1141e65b8c6872eeba6c8ae39f5a9635f8",
+                "native_app":"rdte-t6-minecraft-vanilla-263",
+                "world_id":"lantern-rdte",
+                "credential_scope":"APPS_READ",
+                "transport":"isolated_guest_tls_verified",
+                "observation_mutation_count":0,
+                "ownership_fields_matched":6,
+                "world_activated":False,
+                "physical_true_nas_mutated":False,
+            },
+            "cleanup":{
+                "attempted":True,"zero_residue":True,
+                "app_absent":True,"owned_world_dataset_absent":True,
+            },
+        },
+    }
+
+
 class PlayerCorrelationTests(unittest.TestCase):
+    def test_native_guest_exact_artifact_join_is_not_same_guest_client_or_authority(self):
+        result=correlate(*fixture(),native_source=native_fixture(),
+                         native_guest=native_guest_fixture())
+        self.assertTrue(result["native_guest_same_zip_staged_and_read_back"])
+        self.assertTrue(result["native_guest_app_lifecycle_and_cleanup_correlated"])
+        self.assertFalse(result["same_native_guest_real_client_gameplay_verified"])
+        self.assertFalse(result["collage_managed_deployment"])
+        self.assertFalse(result["principal_authorization_verified"])
+
+    def test_actual_native_guest_anti_forgery_integrity_role_cleanup(self):
+        baseline=native_guest_fixture()
+        for path,bad in (
+            (("classification",),"ORACLE_FAILURE"),
+            (("target","version"),"25.04.1"),
+            (("foundry_materialization","foundry_ref"),"f"*40),
+            (("foundry_materialization","lantern_artifact_stage","artifact_sha256"),"a"*64),
+            (("foundry_materialization","lantern_artifact_stage","download_readback_sha256"),"a"*64),
+            (("foundry_materialization","lantern_artifact_stage","persisted_on_reinstall"),False),
+            (("foundry_materialization","lantern_artifact_stage","artifact_gameplay_effect_verified"),True),
+            (("foundry_materialization","collage_readback","credential_scope"),"FULL_ADMIN"),
+            (("foundry_materialization","collage_readback","observation_mutation_count"),1),
+            (("foundry_materialization","collage_readback","transport"),"insecure"),
+            (("foundry_materialization","cleanup","zero_residue"),False),
+        ):
+            guest=copy.deepcopy(baseline)
+            node=guest
+            for field in path[:-1]:node=node[field]
+            node[path[-1]]=bad
+            with self.subTest(path=path),self.assertRaises(Refused):
+                correlate(*fixture(),native_source=native_fixture(),native_guest=guest)
+        with self.assertRaisesRegex(Refused,"NATIVE_GUEST_NEEDS_EXACT_SOURCE_PLAN"):
+            correlate(*fixture(),native_guest=baseline)
+
     def test_same_real_artifact_across_generic_native_source_and_player_oracle(self):
         result=correlate(*fixture(),native_source=native_fixture())
         self.assertTrue(result["native_app_artifact_source_intent_bound"])
