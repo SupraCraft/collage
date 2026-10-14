@@ -11,7 +11,7 @@ import unittest
 import zipfile
 
 from tools.collage_deploy_plan import Refused
-from tools.consume_vanilla_datapack_source import ALLOWED, consume, verify_candidate
+from tools.consume_vanilla_datapack_source import ALLOWED, consume, verify_candidate, audience_requests, NATIVE_VANILLA263_PRODUCER
 
 
 class ConsumerTests(unittest.TestCase):
@@ -56,6 +56,37 @@ class ConsumerTests(unittest.TestCase):
         with self.assertRaises(Refused) as ctx:
             consume(self.manifest, self.path, self.root)
         self.assertEqual(ctx.exception.code, code)
+
+    def test_exact_real_producer_opt_in_binds_existing_native_guest_owner_not_new_manager(self):
+        self.manifest["producer"] = NATIVE_VANILLA263_PRODUCER
+        actual = consume(self.manifest, self.path, self.root, native_vanilla263=True)
+        self.assertEqual(actual["classification"], "SOURCE_ARTIFACT_AND_INTENT_PARITY_VALIDATED")
+        self.assertEqual(actual["source_native_target_profile"], "vanilla263-250426")
+        self.assertEqual(actual["expected_native_app"], "rdte-t6-minecraft-vanilla-263")
+        self.assertEqual(actual["expected_truenas_version"], "25.04.2.6")
+        self.assertFalse(actual["real_provider_readback"])
+        self.assertFalse(actual["native_guest_with_this_artifact_qualified"])
+        self.assertFalse(actual["mutation_authorized"])
+        candidate=verify_candidate(self.manifest,self.path)
+        intents=audience_requests(candidate,self.path.name,native_vanilla263=True)
+        self.assertEqual([r["principal"]["kind"] for r in intents],
+                         ["human","automation","agent"])
+        self.assertEqual({r["target"]["deployment_id"] for r in intents},
+                         {"rdte-t6-minecraft-vanilla-263"})
+        self.assertEqual({r["target"]["service_id"] for r in intents},
+                         {"11111111-1111-4111-8111-111111111111"})
+        self.assertEqual({r["target"]["world_id"] for r in intents},{"lantern-rdte"})
+
+    def test_native_opt_in_refuses_foreign_producer_world_release(self):
+        for key,value in [("producer","SupraCraft/mc-server-images@"+"a"*40),
+                          ("world_id","foreign-world"),
+                          ("release_id","not-authorized")]:
+            m=dict(self.manifest,producer=NATIVE_VANILLA263_PRODUCER)
+            m[key]=value
+            with self.subTest(field=key):
+                with self.assertRaises(Refused) as e:
+                    consume(m,self.path,self.root,native_vanilla263=True)
+                self.assertEqual(e.exception.code,"EXACT_NATIVE_SOURCE_PROFILE_MISMATCH")
 
     def test_identical_real_bytes_for_three_actor_plans(self):
         report = consume(self.manifest, self.path, self.root)
