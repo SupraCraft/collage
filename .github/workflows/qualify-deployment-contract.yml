@@ -6,9 +6,12 @@ on:
       - 'spec/deployment-request-v1.schema.json'
       - 'tools/collage_deploy_plan.py'
       - 'tools/collage_native_readback.py'
+      - 'tools/collage_disposable_release_grant.py'
       - 'tests/test_collage_deploy_plan.py'
       - 'tests/test_collage_native_readback.py'
+      - 'tests/test_collage_disposable_release_grant.py'
       - 'docs/deployment-contract-v1.md'
+      - 'docs/rdte-signed-release-preflight.md'
       - '.github/workflows/qualify-deployment-contract.yml'
   workflow_dispatch:
 
@@ -16,6 +19,24 @@ permissions:
   contents: read
 
 jobs:
+  release-grant-signature-negatives:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Pin isolated cryptographic verifier
+        run: |
+          python3 -m venv "$RUNNER_TEMP/collage-grant-venv"
+          "$RUNNER_TEMP/collage-grant-venv/bin/python" -m pip install --disable-pip-version-check --only-binary=:all: 'cryptography==46.0.4'
+      - name: Synthetic signed scope/adversarial matrix (NO APPLY)
+        run: |
+          "$RUNNER_TEMP/collage-grant-venv/bin/python" -m unittest discover -s tests -p 'test_collage_disposable_release_grant.py' -v
+      - name: Declare source-only acceptance bound
+        run: echo 'A verified signature is NOT invoking-peer authentication, provider readback, durable nonce/CAS, or any deployment authority.' >> "$GITHUB_STEP_SUMMARY"
+
   source-only-intent:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -30,7 +51,9 @@ jobs:
           python3 -m json.tool spec/deployment-request-v1.schema.json >/dev/null
           python3 -m py_compile tools/collage_deploy_plan.py tools/collage_native_readback.py tests/test_collage_deploy_plan.py tests/test_collage_native_readback.py
       - name: Qualify principal parity and fail-closed source intents
-        run: python3 -m unittest discover -s tests -p 'test_collage_*.py' -v
+        run: |
+          python3 -m unittest discover -s tests -p 'test_collage_deploy_plan.py' -v
+          python3 -m unittest discover -s tests -p 'test_collage_native_readback.py' -v
       - name: Exercise checked-in source-only request against actual fixture bytes
         run: |
           set -euo pipefail
