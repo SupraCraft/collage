@@ -7,11 +7,14 @@ on:
       - 'tools/collage_deploy_plan.py'
       - 'tools/collage_native_readback.py'
       - 'tools/collage_disposable_release_grant.py'
+      - 'tools/collage_rdte_release_cas_probe.py'
       - 'tests/test_collage_deploy_plan.py'
       - 'tests/test_collage_native_readback.py'
       - 'tests/test_collage_disposable_release_grant.py'
+      - 'tests/test_collage_rdte_release_cas_probe.py'
       - 'docs/deployment-contract-v1.md'
       - 'docs/rdte-signed-release-preflight.md'
+      - 'docs/rdte-release-cas-source.md'
       - '.github/workflows/qualify-deployment-contract.yml'
   workflow_dispatch:
 
@@ -34,6 +37,7 @@ jobs:
       - name: Synthetic signed scope/adversarial matrix (NO APPLY)
         run: |
           "$RUNNER_TEMP/collage-grant-venv/bin/python" -m unittest discover -s tests -p 'test_collage_disposable_release_grant.py' -v
+          "$RUNNER_TEMP/collage-grant-venv/bin/python" -m unittest discover -s tests -p 'test_collage_rdte_release_cas_probe.py' -v
       - name: Declare source-only acceptance bound
         run: echo 'A verified signature is NOT invoking-peer authentication, provider readback, durable nonce/CAS, or any deployment authority.' >> "$GITHUB_STEP_SUMMARY"
 
