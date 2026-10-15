@@ -61,7 +61,9 @@ def inspect(*, request: dict, artifact_root, envelope: dict,
         from cryptography.exceptions import InvalidSignature
         Ed25519PublicKey.from_public_bytes(pinned_key).verify(
             bytes.fromhex(envelope["signature"]), canonical(claims))
-    except (ImportError, ValueError, TypeError, InvalidSignature):
+    except (ImportError, ValueError, TypeError):
+        raise Refused("GRANT_SIGNATURE_INVALID") from None
+    except InvalidSignature:
         raise Refused("GRANT_SIGNATURE_INVALID") from None
     p = request["principal"]
     t = request["target"]
