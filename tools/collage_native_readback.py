@@ -21,10 +21,18 @@ else:
 
 SCHEMA = "collage.native-readback/1"
 MAX_PROBE_OUTPUT = 32768
+# Trusted caller selects an exact source-qualified native App catalog version.
+# The historical default preserves the accepted G2 1.15.30 observer; G4
+# 1.15.31 requires an explicit bounded profile, never a floating latest.
+NATIVE_VANILLA263_PROFILES = {
+    "vanilla263-11530": "1.15.30",
+    "vanilla263-11531": "1.15.31",
+}
 
 
 def compare_native(request: dict, observed: object,
-                   trusted_realm: str, manager_id: str, fleet_id: str) -> dict:
+                   trusted_realm: str, manager_id: str, fleet_id: str, *,
+                   native_catalog_profile: str = "vanilla263-11530") -> dict:
     """Pure comparison, NOT independent evidence that the probe was executed."""
     target = request["target"]
     artifact = request["artifact"]
@@ -63,6 +71,8 @@ def compare_native(request: dict, observed: object,
         raise Refused("ARTIFACT_TARGET_DRIFT")
     native_vanilla263 = target["deployment_id"] == "rdte-t6-minecraft-vanilla-263"
     if native_vanilla263:
+        if native_catalog_profile not in NATIVE_VANILLA263_PROFILES:
+            raise Refused("NATIVE_VANILLA263_CATALOG_PROFILE_REFUSED")
         # The exact pinned Go truenas-go v0.5.0 WS client exposes
         # ws.Version().Raw == system.version, e.g. TrueNAS-25.04.2.6,
         # NOT the unprefixed numeric target version. Check exact raw bytes
@@ -79,10 +89,13 @@ def compare_native(request: dict, observed: object,
                 or artifact.get("kind") != "datapack"):
             raise Refused("NATIVE_VANILLA263_TARGET_PROFILE_DRIFT")
         if (observed["truenas_version"] != "TrueNAS-25.04.2.6"
-                or observed["app_version"] != "1.15.30"
+                or observed["app_version"] != NATIVE_VANILLA263_PROFILES[native_catalog_profile]
                 or type(observed["container_count"]) is not int
                 or observed["container_count"] < 1):
             raise Refused("NATIVE_VANILLA263_GUEST_PROFILE_DRIFT")
+    elif native_catalog_profile != "vanilla263-11530":
+        # A vanilla-only 1.15.31 profile must never loosen legacy Paper readback.
+        raise Refused("NATIVE_CATALOG_PROFILE_WRONG_PRODUCT")
     return {
         "native_app": target["deployment_id"],
         "native_app_version": observed["app_version"],
@@ -102,6 +115,9 @@ def main() -> int:
     parser.add_argument("--trusted-realm-id", required=True)
     parser.add_argument("--manager-id", required=True)
     parser.add_argument("--fleet-id", required=True)
+    parser.add_argument("--native-catalog-profile",
+                        choices=sorted(NATIVE_VANILLA263_PROFILES),
+                        default="vanilla263-11530")
     args = parser.parse_args()
     try:
         request = read_json(args.request)
@@ -129,7 +145,8 @@ def main() -> int:
         except ValueError:
             raise Refused("PROBE_OUTPUT_NOT_JSON") from None
         match = compare_native(request, observed, args.trusted_realm_id,
-                               args.manager_id, args.fleet_id)
+                               args.manager_id, args.fleet_id,
+                               native_catalog_profile=args.native_catalog_profile)
         result = {
             "schema": SCHEMA,
             "classification": "PROVIDER_READBACK_MATCH",

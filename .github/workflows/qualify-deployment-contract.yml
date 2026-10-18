@@ -10,6 +10,7 @@ on:
       - 'tools/collage_rdte_release_cas_probe.py'
       - 'tests/test_collage_deploy_plan.py'
       - 'tests/test_collage_native_readback.py'
+      - 'tests/test_native_catalog_018.py'
       - 'tests/test_collage_disposable_release_grant.py'
       - 'tests/test_collage_rdte_release_cas_probe.py'
       - 'docs/deployment-contract-v1.md'
@@ -53,11 +54,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m json.tool spec/deployment-request-v1.schema.json >/dev/null
-          python3 -m py_compile tools/collage_deploy_plan.py tools/collage_native_readback.py tests/test_collage_deploy_plan.py tests/test_collage_native_readback.py
+          python3 -m py_compile tools/collage_deploy_plan.py tools/collage_native_readback.py tests/test_collage_deploy_plan.py tests/test_collage_native_readback.py tests/test_native_catalog_018.py
       - name: Qualify principal parity and fail-closed source intents
         run: |
           python3 -m unittest discover -s tests -p 'test_collage_deploy_plan.py' -v
           python3 -m unittest discover -s tests -p 'test_collage_native_readback.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_catalog_018.py' -v
       - name: Exercise checked-in source-only request against actual fixture bytes
         run: |
           set -euo pipefail
