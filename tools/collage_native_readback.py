@@ -27,6 +27,7 @@ MAX_PROBE_OUTPUT = 32768
 NATIVE_VANILLA263_PROFILES = {
     "vanilla263-11530": "1.15.30",
     "vanilla263-11531": "1.15.31",
+    "vanilla263-11533": "1.15.33",
 }
 
 
