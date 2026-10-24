@@ -53,6 +53,17 @@ class OP4KReadbackCatalogTests(unittest.TestCase):
         self.assertEqual(match["ownership_fields_matched"], 6)
         self.assertEqual(match["truenas_version"], "25.04.2.6")
 
+    def test_current_11533_requires_explicit_pin(self):
+        request, observed = vanilla()
+        observed["app_version"] = "1.15.33"
+        for wrong in ("vanilla263-11530", "vanilla263-11531"):
+            self.reject(request, observed, wrong,
+                        "NATIVE_VANILLA263_GUEST_PROFILE_DRIFT")
+        match = self.compare(request, observed, "vanilla263-11533")
+        self.assertEqual(match["native_app_version"], "1.15.33")
+        self.assertEqual(match["ownership_fields_matched"], 6)
+        self.assertEqual(match["truenas_version"], "25.04.2.6")
+
     def test_no_latest_or_foreign_catalog_pin(self):
         request, observed = vanilla()
         observed["app_version"] = "1.15.31"
